@@ -14,8 +14,8 @@ DS_SNAPSHOT_PATH = os.path.join(BASE_DIR, 'vfec_results', 'ds_snapshot.csv')
 PROJECTS_SOURCE_DIR = os.path.join(BASE_DIR, 'ds_projects')
 RESULTS_DIR = os.path.join(BASE_DIR, 'vfec_results')
 OUTPUT_CSV = os.path.join(RESULTS_DIR, 'tc_results.csv')
-LOG_FILE = os.path.join(RESULTS_DIR, 'tc_verifier_log.txt')      # Summary Log (Info/Errors)
-FULL_LOG_FILE = os.path.join(RESULTS_DIR, 'log_tc_results.txt')   # Complete Build/Test Output
+LOG_FILE = os.path.join(RESULTS_DIR, 'logs/tc_verifier_log.txt')      # Summary Log (Info/Errors)
+FULL_LOG_FILE = os.path.join(RESULTS_DIR, 'logs/log_tc_results.txt')   # Complete Build/Test Output
 
 # --- Logging Setup ---
 if not os.path.exists(RESULTS_DIR):
