@@ -1,3 +1,6 @@
+# Separate the Legacy, Moderern, Unknown, and Missing projects based on the build type (CMake, Make, etc.)
+# for only cosidering the projects with modern build type. 
+
 import pandas as pd
 import os
 
