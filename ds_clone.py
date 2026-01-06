@@ -1,3 +1,6 @@
+# Clones the project repos listed in the selected_projects.csv and exports to ds_projects.
+# Fetched the Generates the clone_log.txt
+
 import os
 import sys
 import pandas as pd
