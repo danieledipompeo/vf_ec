@@ -23,7 +23,6 @@ Crow,https://github.com/CrowCpp/Crow/commit/79eec91f00b5fb7df890d4e84b2f048b0841
 curl,https://github.com/curl/curl/commit/70b1900dd13d16f2e83f571407a614541d5ac9ba,CHANGES;src/main.c,No,380e132da3557235e4eb9aa593e79c62100156ea,1,0,70b1900dd13d16f2e83f571407a614541d5ac9ba,10,0,CVE-2018-16842,CWE-125
 curl,https://github.com/bagder/curl/commit/192c4f788d48f82c03e9cef40013f34370e90737,lib/escape.c,No,da0db499fd1fed3ab061d8c03d25c06164c9f429,8,6,192c4f788d48f82c03e9cef40013f34370e90737,3,2,CVE-2013-2174,CWE-119
 curl,https://github.com/bagder/curl/commit/2eb8dcf26cb37f09cffe26909a646e702dbcab66,lib/cookie.c,No,96ffe645fd2494f14780f7c105fcfeeb8ca7d94f,27,14,2eb8dcf26cb37f09cffe26909a646e702dbcab66,19,5,CVE-2013-1944,CWE-200
-curl,https://github.com/curl/curl/commit/curl-7_50_2~32,lib/vtls/nss.c;RELEASE-NOTES,No,822082d8327a41aafa4c6b7696bfcb8b56037cbf,2,4,curl-7_50_2~32,8,1,,
 curl,https://github.com/curl/curl/commit/d530e92f59ae9bb2d47066c3c460b25d2ffeb211,src/tool_msgs.c,No,e97679a360dda4ea6188b09a145f73a2a84acedd,8,11,d530e92f59ae9bb2d47066c3c460b25d2ffeb211,1,1,CVE-2018-16842,CWE-125
 curl,https://github.com/curl/curl/commit/81d135d67155c5295b1033679c606165d4e28f3f,lib/url.c,No,9d8dad1a9d79d60e021f0c4e0f66bf5d51fb3c4e,1,1,81d135d67155c5295b1033679c606165d4e28f3f,3,1,CVE-2018-16840,CWE-416
 curl,https://github.com/curl/curl/commit/f3a24d7916b9173c69a3e0ee790102993833d6c5,lib/vauth/cleartext.c,No,81d135d67155c5295b1033679c606165d4e28f3f,3,1,f3a24d7916b9173c69a3e0ee790102993833d6c5,1,1,CVE-2018-16839,CWE-119
