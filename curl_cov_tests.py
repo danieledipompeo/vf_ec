@@ -1,3 +1,9 @@
+# FIX_COMMIT for fix commit
+# writer.writerow(["project", "fix_commit", "testfile", "sourcefile"])
+# OUTPUT_CSV = os.path.join(RESULTS_DIR, "test_output.csv")
+# LOG_FILE = os.path.join(RESULTS_DIR, "log", f"{PROJECT_NAME}_{VULN_COMMIT[:8]}.txt")
+
+
 import os
 import subprocess
 import glob
@@ -5,13 +11,14 @@ import csv
 
 # --- HARDCODED CONFIGURATION ---
 PROJECT_NAME = "curl"
-FIX_COMMIT = "192c4f788d48f82c03e9cef40013f34370e90737" # Updated to the commit you are debugging
+FIX_COMMIT = "380e132da3557235e4eb9aa593e79c62100156ea" # Updated to the commit you are debugging
 PROJECT_BASE_DIR = "ds_projects" # Relative to script dir
 RESULTS_DIR = "vfec_results"     # Relative to script dir
 
 # Derived Paths
 PROJECT_PATH = os.path.join(PROJECT_BASE_DIR, PROJECT_NAME)
 LOG_FILE = os.path.join(RESULTS_DIR, "log", f"{PROJECT_NAME}_{FIX_COMMIT[:8]}.txt")
+
 OUTPUT_CSV = os.path.join(RESULTS_DIR, "test_output.csv")
 
 def ensure_dirs():
