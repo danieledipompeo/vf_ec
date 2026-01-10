@@ -7,9 +7,9 @@ import multiprocessing
 # --- HARDCODED CONFIGURATION ---
 PROJECT_NAME = "curl"
 # The commit where the vulnerability exists (Tests run here)
-VULN_COMMIT = "380e132da3557235e4eb9aa593e79c62100156ea" 
+VULN_COMMIT = "96ffe645fd2494f14780f7c105fcfeeb8ca7d94f" 
 # The commit where the fix happened (Used only to identify target source files)
-FIX_COMMIT = "70b1900dd13d16f2e83f571407a614541d5ac9ba" 
+FIX_COMMIT = "2eb8dcf26cb37f09cffe26909a646e702dbcab66" 
 
 PROJECT_BASE_DIR = "ds_projects" # Relative to script dir
 RESULTS_DIR = "vfec_results"     # Relative to script dir
