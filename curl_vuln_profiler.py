@@ -1,3 +1,4 @@
+# previously vuln_test_output.csv renamed to vuln_testcov.csv
 # Computes the energy and performance measurements for vuln_commit of curl
 
 import os
@@ -12,7 +13,7 @@ import shutil
 PROJECT_NAME = "curl"
 PROJECT_BASE_DIR = "ds_projects"
 RESULTS_DIR = "vfec_results"
-CSV_FILE = os.path.join(RESULTS_DIR, "vuln_test_output.csv")
+CSV_FILE = os.path.join(RESULTS_DIR, "vuln_testcov.csv")
 
 # Profiling Settings
 TARGET_DURATION_SEC = 3.0   # Inner Loop duration (Resolution)

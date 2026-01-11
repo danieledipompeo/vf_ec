@@ -1,3 +1,6 @@
+# script renamed
+# Computes the test coverage of vuln_commit with respect to fix_commit's git diff
+
 import os
 import subprocess
 import glob
@@ -17,7 +20,7 @@ RESULTS_DIR = "vfec_results"     # Relative to script dir
 # Derived Paths
 PROJECT_PATH = os.path.join(PROJECT_BASE_DIR, PROJECT_NAME)
 LOG_FILE = os.path.join(RESULTS_DIR, "log", f"vuln_{PROJECT_NAME}_{VULN_COMMIT[:8]}.txt")
-OUTPUT_CSV = os.path.join(RESULTS_DIR, "vuln_test_output.csv")
+OUTPUT_CSV = os.path.join(RESULTS_DIR, "vuln_testcov.csv")
 
 # Silent optimization
 CPU_CORES = multiprocessing.cpu_count()

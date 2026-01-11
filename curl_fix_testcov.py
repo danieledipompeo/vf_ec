@@ -1,3 +1,5 @@
+# script renamed
+# previously test_output.csv is now fix_testcov.csv
 # FIX_COMMIT for fix commit
 # writer.writerow(["project", "fix_commit", "testfile", "sourcefile"])
 # OUTPUT_CSV = os.path.join(RESULTS_DIR, "test_output.csv")
@@ -19,7 +21,7 @@ RESULTS_DIR = "vfec_results"     # Relative to script dir
 PROJECT_PATH = os.path.join(PROJECT_BASE_DIR, PROJECT_NAME)
 LOG_FILE = os.path.join(RESULTS_DIR, "log", f"{PROJECT_NAME}_{FIX_COMMIT[:8]}.txt")
 
-OUTPUT_CSV = os.path.join(RESULTS_DIR, "test_output.csv")
+OUTPUT_CSV = os.path.join(RESULTS_DIR, "fix_testcov.csv")
 
 def ensure_dirs():
     """Create necessary results directories if they don't exist."""
