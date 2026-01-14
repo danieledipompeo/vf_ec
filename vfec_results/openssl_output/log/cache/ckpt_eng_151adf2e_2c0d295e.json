@@ -1,0 +1,18 @@
+{
+    "151adf2e5cc23284a059e0f155505006a1c9fad9": {
+        "clienthellotest": {
+            "energy_pkg": 0.029711664482306686,
+            "energy_core": 0.01996068152031455,
+            "cycles": 1505594.625163827,
+            "instructions": 2302895.893840105
+        }
+    },
+    "2c0d295e26306e15a92eb23a84a1802005c1c137": {
+        "clienthellotest": {
+            "energy_pkg": 0.029909677419354838,
+            "energy_core": 0.02,
+            "cycles": 1470254.437419355,
+            "instructions": 2330420.335483871
+        }
+    }
+}

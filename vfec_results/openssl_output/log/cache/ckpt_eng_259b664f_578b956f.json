@@ -1,0 +1,354 @@
+{
+    "259b664f950c2ba66fbf4b0fe5281327904ead21": {
+        "ecdsatest": {
+            "energy_pkg": 27.94,
+            "energy_core": 21.91,
+            "cycles": 6575557405.0,
+            "instructions": 18592194884.0
+        },
+        "rmdtest": {
+            "energy_pkg": 0.005697329376854599,
+            "energy_core": 0.003691394658753709,
+            "cycles": 111127.8830860534,
+            "instructions": 104759.8118694362
+        },
+        "v3nametest": {
+            "energy_pkg": 0.5005882352941177,
+            "energy_core": 0.39341176470588235,
+            "cycles": 100344827.0,
+            "instructions": 318798757.35294116
+        },
+        "exptest": {
+            "energy_pkg": 10.8775,
+            "energy_core": 8.715,
+            "cycles": 2465117775.75,
+            "instructions": 3361223063.75
+        },
+        "evp_extra_test": {
+            "energy_pkg": 0.11246031746031745,
+            "energy_core": 0.08178571428571428,
+            "cycles": 15071249.476190476,
+            "instructions": 22052319.42857143
+        },
+        "mdc2test": {
+            "energy_pkg": 0.005552575107296137,
+            "energy_core": 0.003830472103004292,
+            "cycles": 150288.3948497854,
+            "instructions": 164030.4549356223
+        },
+        "jpaketest": {
+            "energy_pkg": 0.00512,
+            "energy_core": 0.0034300000000000003,
+            "cycles": 158458.207,
+            "instructions": 146460.297
+        },
+        "dsatest": {
+            "energy_pkg": 1.6403703703703703,
+            "energy_core": 1.3096296296296297,
+            "cycles": 357828957.1851852,
+            "instructions": 446074387.8518519
+        },
+        "hmactest": {
+            "energy_pkg": 0.006536670547147847,
+            "energy_core": 0.004551804423748545,
+            "cycles": 255998.09545983703,
+            "instructions": 307257.2363213038
+        },
+        "igetest": {
+            "energy_pkg": 0.02071888412017167,
+            "energy_core": 0.014291845493562232,
+            "cycles": 991153.2950643777,
+            "instructions": 3115901.145922747
+        },
+        "md4test": {
+            "energy_pkg": 0.005502584721424468,
+            "energy_core": 0.003716255025847214,
+            "cycles": 143316.03790924756,
+            "instructions": 150601.4250430787
+        },
+        "bntest": {
+            "energy_pkg": 13.726666666666667,
+            "energy_core": 10.703333333333333,
+            "cycles": 3317511114.6666665,
+            "instructions": 7730817133.666667
+        },
+        "ectest": {
+            "energy_pkg": 28.945,
+            "energy_core": 22.705,
+            "cycles": 6828937400.5,
+            "instructions": 23094497024.0
+        },
+        "dummytest": {
+            "energy_pkg": 0.00505,
+            "energy_core": 0.00342,
+            "cycles": 128973.824,
+            "instructions": 130829.756
+        },
+        "enginetest": {
+            "energy_pkg": 0.05748858447488584,
+            "energy_core": 0.04,
+            "cycles": 4367769.015981735,
+            "instructions": 8992656.696347032
+        },
+        "randtest": {
+            "energy_pkg": 0.009002267573696146,
+            "energy_core": 0.005925925925925926,
+            "cycles": 320826.0120937264,
+            "instructions": 421512.6953892668
+        },
+        "shatest": {
+            "energy_pkg": 0.03131656804733728,
+            "energy_core": 0.02099112426035503,
+            "cycles": 1552791.822485207,
+            "instructions": 5186226.307692308
+        },
+        "rsa_test": {
+            "energy_pkg": 27.82,
+            "energy_core": 21.87,
+            "cycles": 6516657323.5,
+            "instructions": 7768297240.0
+        },
+        "rc5test": {
+            "energy_pkg": 0.005106151333696244,
+            "energy_core": 0.0034240609689711486,
+            "cycles": 134410.0391943386,
+            "instructions": 136712.33805117037
+        },
+        "asn1test": {
+            "energy_pkg": 0.004525,
+            "energy_core": 0.0031349999999999998,
+            "cycles": 135371.8545,
+            "instructions": 142049.8845
+        },
+        "ecdhtest": {
+            "energy_pkg": 4.176363636363636,
+            "energy_core": 3.3045454545454547,
+            "cycles": 947391462.5454545,
+            "instructions": 2541264848.4545455
+        },
+        "rc4test": {
+            "energy_pkg": 0.074,
+            "energy_core": 0.052177215189873415,
+            "cycles": 7229262.410126583,
+            "instructions": 31019316.293670885
+        },
+        "sha1test": {
+            "energy_pkg": 0.032748447204968945,
+            "energy_core": 0.022251552795031056,
+            "cycles": 2014542.850931677,
+            "instructions": 6924061.105590062
+        },
+        "md2test": {
+            "energy_pkg": 0.004447031431897555,
+            "energy_core": 0.002846332945285215,
+            "cycles": 86764.51804423748,
+            "instructions": 71451.35739231664
+        },
+        "destest": {
+            "energy_pkg": 0.006008636644046885,
+            "energy_core": 0.0038926588525601477,
+            "cycles": 144650.78963602716,
+            "instructions": 187496.39728562615
+        },
+        "md5test": {
+            "energy_pkg": 0.0052872928176795585,
+            "energy_core": 0.003574585635359116,
+            "cycles": 134350.6364640884,
+            "instructions": 133744.1723756906
+        },
+        "srptest": {
+            "energy_pkg": 0.4755,
+            "energy_core": 0.37687499999999996,
+            "cycles": 99473244.35,
+            "instructions": 118436059.5875
+        },
+        "clienthellotest": {
+            "energy_pkg": 0.027108108108108108,
+            "energy_core": 0.018364864864864865,
+            "cycles": 1449007.008108108,
+            "instructions": 2426178.0756756756
+        },
+        "dhtest": {
+            "energy_pkg": 1.4417857142857142,
+            "energy_core": 1.1492857142857142,
+            "cycles": 320964592.85714287,
+            "instructions": 389275985.28571427
+        }
+    },
+    "578b956fe741bf8e84055547b1e83c28dd902c73": {
+        "ecdsatest": {
+            "energy_pkg": 28.365,
+            "energy_core": 22.585,
+            "cycles": 6504157054.5,
+            "instructions": 18425553219.5
+        },
+        "rmdtest": {
+            "energy_pkg": 0.005640579710144928,
+            "energy_core": 0.003791304347826087,
+            "cycles": 140563.33971014494,
+            "instructions": 140525.48811594202
+        },
+        "v3nametest": {
+            "energy_pkg": 0.5076190476190476,
+            "energy_core": 0.4003571428571429,
+            "cycles": 94672513.32142857,
+            "instructions": 300464417.85714287
+        },
+        "exptest": {
+            "energy_pkg": 10.315,
+            "energy_core": 8.18,
+            "cycles": 2360407708.75,
+            "instructions": 3247609382.25
+        },
+        "evp_extra_test": {
+            "energy_pkg": 0.10788617886178861,
+            "energy_core": 0.078739837398374,
+            "cycles": 14030158.508130081,
+            "instructions": 20830030.585365854
+        },
+        "mdc2test": {
+            "energy_pkg": 0.005121951219512195,
+            "energy_core": 0.003462354188759279,
+            "cycles": 129023.87804878049,
+            "instructions": 129457.93690349947
+        },
+        "jpaketest": {
+            "energy_pkg": 0.0052,
+            "energy_core": 0.003605,
+            "cycles": 150934.567,
+            "instructions": 161428.0615
+        },
+        "dsatest": {
+            "energy_pkg": 1.5365517241379312,
+            "energy_core": 1.2206896551724138,
+            "cycles": 338249502.4137931,
+            "instructions": 396587231.9655172
+        },
+        "hmactest": {
+            "energy_pkg": 0.005606349206349206,
+            "energy_core": 0.0036888888888888887,
+            "cycles": 112773.8380952381,
+            "instructions": 114164.54285714286
+        },
+        "igetest": {
+            "energy_pkg": 0.020715835140997833,
+            "energy_core": 0.014186550976138829,
+            "cycles": 855177.7028199566,
+            "instructions": 2657125.565075922
+        },
+        "md4test": {
+            "energy_pkg": 0.005446236559139785,
+            "energy_core": 0.003650537634408602,
+            "cycles": 142934.39032258064,
+            "instructions": 152921.6747311828
+        },
+        "bntest": {
+            "energy_pkg": 14.51,
+            "energy_core": 11.363333333333335,
+            "cycles": 3453679048.0,
+            "instructions": 7926728337.0
+        },
+        "ectest": {
+            "energy_pkg": 28.44,
+            "energy_core": 22.095,
+            "cycles": 6851673007.5,
+            "instructions": 23108852442.0
+        },
+        "dummytest": {
+            "energy_pkg": 0.0047122074636306134,
+            "energy_core": 0.003099304237824162,
+            "cycles": 115010.1385199241,
+            "instructions": 110481.22960151803
+        },
+        "enginetest": {
+            "energy_pkg": 0.056592427616926504,
+            "energy_core": 0.039242761692650334,
+            "cycles": 4020094.3518930958,
+            "instructions": 8434287.532293987
+        },
+        "randtest": {
+            "energy_pkg": 0.009564625850340137,
+            "energy_core": 0.006414965986394558,
+            "cycles": 281927.92176870746,
+            "instructions": 359123.9775510204
+        },
+        "shatest": {
+            "energy_pkg": 0.03141955835962145,
+            "energy_core": 0.021293375394321766,
+            "cycles": 1772578.9022082018,
+            "instructions": 6084130.414826498
+        },
+        "rsa_test": {
+            "energy_pkg": 28.385,
+            "energy_core": 22.405,
+            "cycles": 6597863929.5,
+            "instructions": 7786022848.5
+        },
+        "rc5test": {
+            "energy_pkg": 0.004573268921095008,
+            "energy_core": 0.0030112721417069246,
+            "cycles": 91730.4562533548,
+            "instructions": 87226.6741814278
+        },
+        "asn1test": {
+            "energy_pkg": 0.00533,
+            "energy_core": 0.003785,
+            "cycles": 220412.3505,
+            "instructions": 216892.147
+        },
+        "ecdhtest": {
+            "energy_pkg": 4.4030000000000005,
+            "energy_core": 3.505,
+            "cycles": 976748884.9,
+            "instructions": 2580092853.9
+        },
+        "rc4test": {
+            "energy_pkg": 0.07478873239436619,
+            "energy_core": 0.052652582159624414,
+            "cycles": 7285605.645539906,
+            "instructions": 30860068.450704224
+        },
+        "sha1test": {
+            "energy_pkg": 0.033623417721518986,
+            "energy_core": 0.02287974683544304,
+            "cycles": 1991829.9161392406,
+            "instructions": 6585472.405063291
+        },
+        "md2test": {
+            "energy_pkg": 0.005085849615156898,
+            "energy_core": 0.0034635879218472467,
+            "cycles": 150947.3931320308,
+            "instructions": 157746.28596802842
+        },
+        "destest": {
+            "energy_pkg": 0.007071990320629159,
+            "energy_core": 0.004839685420447671,
+            "cycles": 208674.8191167574,
+            "instructions": 279813.29945553537
+        },
+        "md5test": {
+            "energy_pkg": 0.005687919463087248,
+            "energy_core": 0.003909395973154362,
+            "cycles": 162791.1437360179,
+            "instructions": 171053.92225950782
+        },
+        "srptest": {
+            "energy_pkg": 0.4703409090909091,
+            "energy_core": 0.3728409090909091,
+            "cycles": 98855124.69318181,
+            "instructions": 118962181.73863636
+        },
+        "clienthellotest": {
+            "energy_pkg": 0.027073170731707317,
+            "energy_core": 0.01845528455284553,
+            "cycles": 1331617.2303523035,
+            "instructions": 2341644.2005420052
+        },
+        "dhtest": {
+            "energy_pkg": 1.4413333333333334,
+            "energy_core": 1.1483333333333334,
+            "cycles": 322885954.8333333,
+            "instructions": 390739049.53333336
+        }
+    }
+}

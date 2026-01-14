@@ -1,0 +1,544 @@
+{
+    "437b7302b09a04e0fbfcd594114b52c5c6d89d32": {
+        "fate-swr-resample-s32p-96000-44100": {
+            "energy_pkg": 3.5075,
+            "energy_core": 2.635,
+            "cycles": 755692932.25,
+            "instructions": 1629620656.25
+        },
+        "fate-acodec-mp2": {
+            "energy_pkg": 3.803333333333333,
+            "energy_core": 2.8433333333333333,
+            "cycles": 803448815.4444444,
+            "instructions": 1805189076.8888888
+        },
+        "fate-vsynth2-mov-bpp16": {
+            "energy_pkg": 5.288,
+            "energy_core": 3.904,
+            "cycles": 1113923457.6,
+            "instructions": 3169152329.0
+        },
+        "fate-vsynth3-flv": {
+            "energy_pkg": 3.5685714285714285,
+            "energy_core": 2.6685714285714286,
+            "cycles": 753715448.2857143,
+            "instructions": 1598865649.142857
+        },
+        "fate-vsynth1-dnxhd-uhd-hr-sq": {
+            "energy_pkg": 22.53,
+            "energy_core": 17.005,
+            "cycles": 5345013413.5,
+            "instructions": 16709032933.0
+        },
+        "fate-vsynth2-v210": {
+            "energy_pkg": 5.47,
+            "energy_core": 3.99875,
+            "cycles": 1186780309.75,
+            "instructions": 3088157157.0
+        },
+        "fate-utvideoenc_rgba_left": {
+            "energy_pkg": 5.29625,
+            "energy_core": 3.8825,
+            "cycles": 1315130134.75,
+            "instructions": 2984552733.625
+        },
+        "fate-vsynth3-dnxhd-1080i-10bit": {
+            "energy_pkg": 7.372,
+            "energy_core": 5.492,
+            "cycles": 1670035453.8,
+            "instructions": 5054868314.6
+        },
+        "fate-seek-acodec-pcm-u8": {
+            "energy_pkg": 3.8033333333333332,
+            "energy_core": 2.81,
+            "cycles": 795579076.3333334,
+            "instructions": 1637281599.6666667
+        },
+        "fate-vsynth1-qtrlegray": {
+            "energy_pkg": 5.101428571428571,
+            "energy_core": 3.75,
+            "cycles": 1147071511.2857144,
+            "instructions": 3232608153.857143
+        },
+        "fate-lavf-mpg": {
+            "energy_pkg": 7.394,
+            "energy_core": 5.258,
+            "cycles": 1638734097.4,
+            "instructions": 3908247062.4
+        },
+        "fate-filter-removegrain-mode-16": {
+            "energy_pkg": 3.4372727272727275,
+            "energy_core": 2.536363636363636,
+            "cycles": 780672327.3636364,
+            "instructions": 1605815623.909091
+        },
+        "fate-filter-pixdesc-yuva444p16le": {
+            "energy_pkg": 3.6966666666666668,
+            "energy_core": 2.7466666666666666,
+            "cycles": 821201000.3333334,
+            "instructions": 1788544507.5
+        },
+        "fate-filter-minterpolate-down": {
+            "energy_pkg": 3.6236363636363635,
+            "energy_core": 2.7163636363636363,
+            "cycles": 787069302.8181819,
+            "instructions": 1733660132.3636363
+        },
+        "fate-vsynth1-huffyuv": {
+            "energy_pkg": 5.797142857142857,
+            "energy_core": 4.234285714285714,
+            "cycles": 1285388145.142857,
+            "instructions": 2958126593.142857
+        },
+        "fate-dnn-layer-avgpool": {
+            "energy_pkg": 3.393333333333333,
+            "energy_core": 2.5166666666666666,
+            "cycles": 740605239.6666666,
+            "instructions": 1568951688.0
+        },
+        "fate-filter-removegrain-mode-09": {
+            "energy_pkg": 3.555454545454545,
+            "energy_core": 2.576363636363636,
+            "cycles": 793004465.6363636,
+            "instructions": 1593779356.1818182
+        },
+        "fate-filter-removegrain-mode-21": {
+            "energy_pkg": 3.455454545454545,
+            "energy_core": 2.5454545454545454,
+            "cycles": 757085161.4545455,
+            "instructions": 1594441857.1818182
+        },
+        "fate-ffprobe_xml": {
+            "energy_pkg": 3.3863636363636362,
+            "energy_core": 2.4918181818181817,
+            "cycles": 787726370.7272727,
+            "instructions": 1619244477.4545455
+        },
+        "fate-swr-resample_exact_lin-s32p-48000-44100": {
+            "energy_pkg": 3.72,
+            "energy_core": 2.659,
+            "cycles": 868983615.0,
+            "instructions": 1681966225.7
+        },
+        "fate-lavf-pgm": {
+            "energy_pkg": 3.6049999999999995,
+            "energy_core": 2.62,
+            "cycles": 789874952.8,
+            "instructions": 1635893843.6
+        },
+        "fate-swr-resample-s32p-8000-48000": {
+            "energy_pkg": 3.5455555555555556,
+            "energy_core": 2.641111111111111,
+            "cycles": 762000490.6666666,
+            "instructions": 1621872166.6666667
+        },
+        "fate-swr-resample-s32p-8000-96000": {
+            "energy_pkg": 3.6627272727272726,
+            "energy_core": 2.7454545454545456,
+            "cycles": 805700184.7272727,
+            "instructions": 1739149367.2727273
+        },
+        "fate-swr-resample_lin-fltp-48000-8000": {
+            "energy_pkg": 3.563636363636364,
+            "energy_core": 2.648181818181818,
+            "cycles": 767411435.5454545,
+            "instructions": 1653932880.1818182
+        },
+        "fate-checkasm-vf_blend": {
+            "energy_pkg": 3.46,
+            "energy_core": 2.56,
+            "cycles": 772782720.0,
+            "instructions": 1665107770.0
+        },
+        "fate-vsynth2-ffvhuff": {
+            "energy_pkg": 4.974285714285714,
+            "energy_core": 3.608571428571429,
+            "cycles": 1064622151.7142857,
+            "instructions": 2071888384.7142856
+        },
+        "fate-vsynth3-mjpeg": {
+            "energy_pkg": 3.564,
+            "energy_core": 2.6420000000000003,
+            "cycles": 765027580.2,
+            "instructions": 1618861913.5
+        },
+        "fate-swr-resample_exact-fltp-48000-96000": {
+            "energy_pkg": 3.598181818181818,
+            "energy_core": 2.6254545454545455,
+            "cycles": 780456784.5454545,
+            "instructions": 1621905894.909091
+        },
+        "fate-vsynth1-jpegls": {
+            "energy_pkg": 18.38,
+            "energy_core": 13.996666666666668,
+            "cycles": 4270041807.6666665,
+            "instructions": 9699786419.333334
+        },
+        "fate-filter-pixdesc-gbrapf32be": {
+            "energy_pkg": 3.793,
+            "energy_core": 2.84,
+            "cycles": 839979482.7,
+            "instructions": 1827674225.8
+        },
+        "fate-seek-acodec-pcm-s8": {
+            "energy_pkg": 3.739,
+            "energy_core": 2.769,
+            "cycles": 778131921.7,
+            "instructions": 1670897065.2
+        },
+        "fate-vsynth1-dnxhd-720p": {
+            "energy_pkg": 7.368,
+            "energy_core": 5.538,
+            "cycles": 1666517527.8,
+            "instructions": 4189194279.0
+        },
+        "fate-vsynth1-mov-bgr24": {
+            "energy_pkg": 5.292857142857143,
+            "energy_core": 3.8485714285714288,
+            "cycles": 1152188210.2857144,
+            "instructions": 3016023462.0
+        },
+        "fate-filter-extrastereo": {
+            "energy_pkg": 3.5072727272727273,
+            "energy_core": 2.5954545454545457,
+            "cycles": 769918576.5454545,
+            "instructions": 1632132210.090909
+        },
+        "fate-vsynth1-vc2-420p10": {
+            "energy_pkg": 4.301111111111111,
+            "energy_core": 3.1144444444444446,
+            "cycles": 926908749.7777778,
+            "instructions": 1862539809.6666667
+        },
+        "fate-seek-acodec-adpcm-yamaha": {
+            "energy_pkg": 3.978,
+            "energy_core": 2.9219999999999997,
+            "cycles": 820987092.1,
+            "instructions": 1751819797.7
+        },
+        "fate-seek-acodec-adpcm-swf": {
+            "energy_pkg": 3.777272727272727,
+            "energy_core": 2.7954545454545454,
+            "cycles": 762120170.4545455,
+            "instructions": 1694495304.4545455
+        },
+        "fate-swr-resample-fltp-44100-48000": {
+            "energy_pkg": 3.4590000000000005,
+            "energy_core": 2.621,
+            "cycles": 708628757.5,
+            "instructions": 1612590928.5
+        },
+        "fate-lavf-caf": {
+            "energy_pkg": 3.3515384615384614,
+            "energy_core": 2.586153846153846,
+            "cycles": 685700552.2307693,
+            "instructions": 1576663692.6153846
+        },
+        "fate-vsynth1-h263-obmc": {
+            "energy_pkg": 5.738571428571428,
+            "energy_core": 4.38,
+            "cycles": 1189763883.857143,
+            "instructions": 3099476031.571429
+        },
+        "fate-vsynth2-prores_444": {
+            "energy_pkg": 10.3975,
+            "energy_core": 7.9025,
+            "cycles": 2437363351.5,
+            "instructions": 6687750897.5
+        },
+        "fate-seek-lavf-y4m": {
+            "energy_pkg": 3.668,
+            "energy_core": 2.773,
+            "cycles": 723253916.3,
+            "instructions": 1619615082.3
+        },
+        "fate-swr-resample_exact_lin-s32p-8000-48000": {
+            "energy_pkg": 3.5124999999999997,
+            "energy_core": 2.5933333333333333,
+            "cycles": 743773858.75,
+            "instructions": 1637001914.0
+        },
+        "fate-vsynth3-r210": {
+            "energy_pkg": 3.4427272727272724,
+            "energy_core": 2.5727272727272728,
+            "cycles": 734077884.7272727,
+            "instructions": 1607951995.4545455
+        },
+        "fate-vsynth2-vc2-420p12": {
+            "energy_pkg": 4.111,
+            "energy_core": 3.088,
+            "cycles": 844235438.0,
+            "instructions": 1850620668.5
+        },
+        "fate-vsynth1-avui": {
+            "energy_pkg": 6.105714285714286,
+            "energy_core": 4.4557142857142855,
+            "cycles": 1356282925.857143,
+            "instructions": 3362419621.285714
+        },
+        "fate-vsynth3-v308": {
+            "energy_pkg": 3.4416666666666664,
+            "energy_core": 2.5425,
+            "cycles": 722206594.9166666,
+            "instructions": 1588149813.0
+        },
+        "fate-utvideoenc_rgba_median": {
+            "energy_pkg": 4.760000000000001,
+            "energy_core": 3.6544444444444446,
+            "cycles": 1024597941.0,
+            "instructions": 2728950504.888889
+        },
+        "fate-swr-resample_exact_lin-dblp-8000-44100": {
+            "energy_pkg": 3.4725,
+            "energy_core": 2.6766666666666663,
+            "cycles": 713441643.5833334,
+            "instructions": 1623203810.6666667
+        },
+        "fate-filter-framerate-up": {
+            "energy_pkg": 3.292307692307692,
+            "energy_core": 2.5561538461538458,
+            "cycles": 690102923.9230769,
+            "instructions": 1584475619.6153846
+        },
+        "fate-vsynth3-dnxhd-edge2-hr": {
+            "energy_pkg": 3.565,
+            "energy_core": 2.6641666666666666,
+            "cycles": 733703302.4166666,
+            "instructions": 1649282262.8333333
+        },
+        "fate-filter-framepack-lines": {
+            "energy_pkg": 3.435,
+            "energy_core": 2.5858333333333334,
+            "cycles": 716553050.75,
+            "instructions": 1602946972.5833333
+        },
+        "fate-filter-pixdesc-yuv422p16le": {
+            "energy_pkg": 3.5,
+            "energy_core": 2.606923076923077,
+            "cycles": 774731827.0,
+            "instructions": 1704535291.6153846
+        },
+        "fate-filter-pan-upmix2": {
+            "energy_pkg": 3.339166666666667,
+            "energy_core": 2.5933333333333333,
+            "cycles": 684386974.6666666,
+            "instructions": 1594168589.0
+        },
+        "fate-filter-removegrain-mode-01": {
+            "energy_pkg": 3.325384615384615,
+            "energy_core": 2.5553846153846154,
+            "cycles": 693905666.3846154,
+            "instructions": 1578376896.3846154
+        },
+        "fate-filter-tile": {
+            "energy_pkg": 3.5,
+            "energy_core": 2.607,
+            "cycles": 757081671.9,
+            "instructions": 1642437893.0
+        },
+        "fate-swr-resample_exact-fltp-44100-96000": {
+            "energy_pkg": 3.435,
+            "energy_core": 2.6558333333333333,
+            "cycles": 698481822.4166666,
+            "instructions": 1605979373.4166667
+        },
+        "fate-filter-pixdesc-yuva444p12le": {
+            "energy_pkg": 3.5591666666666666,
+            "energy_core": 2.7458333333333336,
+            "cycles": 733517747.0833334,
+            "instructions": 1744277509.25
+        },
+        "fate-vsynth1-v210-10": {
+            "energy_pkg": 5.08875,
+            "energy_core": 3.69,
+            "cycles": 1113826585.25,
+            "instructions": 3000718388.0
+        },
+        "fate-vsynth2-ffvhuff420p12": {
+            "energy_pkg": 5.758571428571429,
+            "energy_core": 4.180000000000001,
+            "cycles": 1291087148.2857144,
+            "instructions": 2497080144.0
+        },
+        "fate-lavf-rgba64le.dpx": {
+            "energy_pkg": 3.973,
+            "energy_core": 2.955,
+            "cycles": 845349679.5,
+            "instructions": 1916810289.7
+        },
+        "fate-seek-lavf-ts": {
+            "energy_pkg": 4.661111111111111,
+            "energy_core": 3.5688888888888886,
+            "cycles": 944976796.1111112,
+            "instructions": 2320632819.2222223
+        },
+        "fate-vsynth2-mpeg2-ivlc-qprd": {
+            "energy_pkg": 11.725,
+            "energy_core": 9.0625,
+            "cycles": 2689380856.75,
+            "instructions": 7851272095.25
+        },
+        "fate-swr-resample_exact-s16p-8000-48000": {
+            "energy_pkg": 3.4783333333333335,
+            "energy_core": 2.5833333333333335,
+            "cycles": 738148344.9166666,
+            "instructions": 1624722935.0833333
+        },
+        "fate-vsynth2-dnxhd-1080i-colr": {
+            "energy_pkg": 10.2225,
+            "energy_core": 7.705,
+            "cycles": 2441163559.0,
+            "instructions": 6539004302.5
+        },
+        "fate-vsynth2-ffv1": {
+            "energy_pkg": 9.158,
+            "energy_core": 7.108,
+            "cycles": 2046072831.6,
+            "instructions": 4369610861.8
+        },
+        "fate-filter-pixdesc-yuv444p16le": {
+            "energy_pkg": 3.532,
+            "energy_core": 2.601,
+            "cycles": 761213173.5,
+            "instructions": 1713028226.8
+        },
+        "fate-ffmpeg-filter_complex": {
+            "energy_pkg": 3.3007692307692307,
+            "energy_core": 2.5761538461538462,
+            "cycles": 697948397.2307693,
+            "instructions": 1598309993.4615386
+        },
+        "fate-lavf-mxf_dvcpro50": {
+            "energy_pkg": 8.6,
+            "energy_core": 6.798,
+            "cycles": 2016399443.8,
+            "instructions": 5520159080.8
+        },
+        "fate-filter-pixdesc-gray9le": {
+            "energy_pkg": 3.3925,
+            "energy_core": 2.625,
+            "cycles": 702506309.0833334,
+            "instructions": 1617263976.3333333
+        },
+        "fate-filter-pixdesc-yuva420p9le": {
+            "energy_pkg": 3.5425,
+            "energy_core": 2.6575,
+            "cycles": 777152436.9166666,
+            "instructions": 1696841620.3333333
+        },
+        "fate-vsynth1-dnxhd-720p-rd": {
+            "energy_pkg": 8.656,
+            "energy_core": 6.786,
+            "cycles": 2211160954.6,
+            "instructions": 6041837111.0
+        },
+        "fate-vsynth1-bpp1": {
+            "energy_pkg": 4.636666666666667,
+            "energy_core": 3.4344444444444444,
+            "cycles": 996012042.7777778,
+            "instructions": 2937956489.2222223
+        },
+        "fate-vsynth3-mpeg4-qprd": {
+            "energy_pkg": 4.059,
+            "energy_core": 3.039,
+            "cycles": 867960298.2,
+            "instructions": 1981436443.1
+        },
+        "fate-vsynth3-rgb": {
+            "energy_pkg": 3.4315384615384614,
+            "energy_core": 2.6546153846153846,
+            "cycles": 696426990.0769231,
+            "instructions": 1601407655.6923077
+        },
+        "fate-vsynth1-dv-411": {
+            "energy_pkg": 11.325,
+            "energy_core": 8.4225,
+            "cycles": 2682053752.0,
+            "instructions": 7354177525.25
+        },
+        "fate-seek-acodec-pcm-s32le": {
+            "energy_pkg": 3.803,
+            "energy_core": 2.823,
+            "cycles": 770770346.8,
+            "instructions": 1689958569.7
+        },
+        "fate-filter-vectorscope_color3": {
+            "energy_pkg": 3.3316666666666666,
+            "energy_core": 2.535,
+            "cycles": 716133648.0833334,
+            "instructions": 1583942541.5
+        },
+        "fate-filter-pixdesc-rgb565le": {
+            "energy_pkg": 3.4453846153846155,
+            "energy_core": 2.6138461538461537,
+            "cycles": 725399617.0769231,
+            "instructions": 1670331540.4615386
+        },
+        "fate-filter-scale500": {
+            "energy_pkg": 3.4791666666666665,
+            "energy_core": 2.5866666666666664,
+            "cycles": 748829742.0,
+            "instructions": 1742795237.75
+        },
+        "fate-vsynth3-huffyuv": {
+            "energy_pkg": 3.507,
+            "energy_core": 2.577,
+            "cycles": 757275848.8,
+            "instructions": 1625975859.7
+        },
+        "fate-concat-demuxer-simple2-lavf-ts": {
+            "energy_pkg": 5.155714285714287,
+            "energy_core": 3.6700000000000004,
+            "cycles": 1196168176.4285715,
+            "instructions": 2621435744.0
+        },
+        "fate-filter-overlay": {
+            "energy_pkg": 3.7350000000000003,
+            "energy_core": 2.634,
+            "cycles": 835118581.5,
+            "instructions": 1893129771.1
+        },
+        "fate-swr-resample_exact-s16p-2626-96000": {
+            "energy_pkg": 3.9366666666666665,
+            "energy_core": 2.89,
+            "cycles": 866433503.5555556,
+            "instructions": 1936924518.6666667
+        },
+        "fate-acodec-pcm-u32le": {
+            "energy_pkg": 3.802857142857143,
+            "energy_core": 2.777142857142857,
+            "cycles": 813102803.1428572,
+            "instructions": 1787848217.142857
+        },
+        "fate-filter-pan-downmix2": {
+            "energy_pkg": 3.435,
+            "energy_core": 2.50375,
+            "cycles": 782121174.125,
+            "instructions": 1665228319.0
+        },
+        "fate-swr-resample_exact_lin-s16p-96000-48000": {
+            "energy_pkg": 3.6683333333333334,
+            "energy_core": 2.705,
+            "cycles": 804543876.1666666,
+            "instructions": 1710894242.0
+        },
+        "fate-vsynth2-vc2-420p10": {
+            "energy_pkg": 4.144444444444444,
+            "energy_core": 2.961111111111111,
+            "cycles": 898775087.0,
+            "instructions": 1846065815.0
+        },
+        "fate-filter-separatefields": {
+            "energy_pkg": 3.391818181818182,
+            "energy_core": 2.6036363636363635,
+            "cycles": 690969910.8181819,
+            "instructions": 1587829938.1818182
+        },
+        "fate-lavf-gray.pam": {
+            "energy_pkg": 3.4683333333333333,
+            "energy_core": 2.665833333333333,
+            "cycles": 699056048.6666666,
+            "instructions": 1627267807.9166667
+        }
+    }
+}

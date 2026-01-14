@@ -1,0 +1,52 @@
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 1. Install Dependencies (Optimized for OpenSSL)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    pkg-config \
+    git \
+    python3 \
+    linux-tools-common \
+    libslang2 \
+    libunwind8 \
+    liblzma5 \
+    libnuma1 \
+    libelf1 \
+    libdw1 \
+    libzstd1 \
+    libdebuginfod1 \
+    libpfm4 \
+    libpython3.12 \
+    libperl5.38 \
+    libtraceevent1 \
+    libbabeltrace1 \
+    rsync \
+    wget \
+    curl \
+    perl \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Setup paths
+WORKDIR /app
+RUN mkdir -p /app/inputs \
+    && mkdir -p /app/output
+
+# 3. Git fix
+RUN git config --global --add safe.directory '*'
+
+# 4. Remove default perf wrapper
+RUN rm -f /usr/bin/perf
+
+# ------------------------------------------------------------------
+# DOWNLOAD RESOURCES
+# ------------------------------------------------------------------
+
+# Download OpenSSL Repo to /app/inputs/openssl
+RUN git clone https://github.com/openssl/openssl.git /app/inputs/openssl
+
+# ------------------------------------------------------------------
+
+COPY openssl_pipeline.py /app/
+
+CMD ["python3", "openssl_pipeline.py"]
