@@ -2,7 +2,7 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # 1. Install Dependencies
-# Added 'libtraceevent1' and 'libbabeltrace1'
+# Added 'rsync', 'wget', 'curl' to handle downloads inside the image
 RUN apt-get update && apt-get install -y \
     build-essential \
     pkg-config \
@@ -23,21 +23,36 @@ RUN apt-get update && apt-get install -y \
     libperl5.38 \
     libtraceevent1 \
     libbabeltrace1 \
+    rsync \
+    wget \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Setup paths
+# Creating specific directories for inputs (repo/samples) and output (results)
 WORKDIR /app
-RUN mkdir -p /app/ds_projects/FFmpeg \
-    && mkdir -p /app/ds_projects/fate-samples \
-    && mkdir -p /app/vfec_results
+RUN mkdir -p /app/inputs \
+    && mkdir -p /app/output
 
 # 3. Git fix
 RUN git config --global --add safe.directory '*'
 
-# 4. Remove default perf wrapper
+# 4. Remove default perf wrapper to allow host perf mount
 RUN rm -f /usr/bin/perf
 
+# ------------------------------------------------------------------
+# DOWNLOAD RESOURCES
+# ------------------------------------------------------------------
+
+# A. Download FFmpeg Repo to /app/inputs/FFmpeg
+RUN git clone https://github.com/FFmpeg/FFmpeg.git /app/inputs/FFmpeg
+
+# B. Download FATE Samples to /app/inputs/fate-samples
+# (This step will take some time due to file size)
+RUN rsync -aL rsync://fate-suite.ffmpeg.org/fate-suite/ /app/inputs/fate-samples/
+
+# ------------------------------------------------------------------
+
 COPY ffmpeg_pipeline.py /app/
-COPY input_ffmpeg.csv /app/
 
 CMD ["python3", "ffmpeg_pipeline.py"]

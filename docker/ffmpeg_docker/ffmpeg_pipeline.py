@@ -6,33 +6,37 @@ import json
 import time
 import math
 import sys
+import urllib.request
 
 # ==========================================
 # CONFIGURATION
 # ==========================================
-REPO_NAME = "FFmpeg"
-TARGET_DURATION_SEC = 3.0
-CSV_WRITE_INTERVAL = 50
-TEST_LIMIT = None  # Set to integer (e.g., 5) for debugging, None for full run
+REPO_NAME = "FFmpeg"       # Target project to filter from the Gist CSV
+TARGET_DURATION_SEC = 2.0  # Duration for energy measurement loop
+CSV_WRITE_INTERVAL = 50    # Write to disk every 50 tests
+TEST_LIMIT = None          # Set to None for full production run
+
+# Gist URL for the Unified CSV
+GIST_CSV_URL = "https://gist.githubusercontent.com/waheed-sep/935cfc1ba42b2475d45336a4c779cbc8/raw/ea91568360d87979373a7eca38f289c9bf30d103/cwe_projects.csv"
 
 # ==========================================
 # PATHS
 # ==========================================
 BASE_DIR = "/app"
-INPUT_CSV = os.path.join(BASE_DIR, "input_ffmpeg.csv")
+INPUT_DIR = os.path.join(BASE_DIR, "inputs")
+OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 
-# Input Directories (Mounted from Host)
-PROJECT_DIR = os.path.join(BASE_DIR, "ds_projects", REPO_NAME)
-SAMPLES_DIR = os.path.join(BASE_DIR, "ds_projects", "fate-samples")
+# Input Paths
+INPUT_CSV = os.path.join(INPUT_DIR, "cwe_projects.csv")
+PROJECT_DIR = os.path.join(INPUT_DIR, REPO_NAME)  # e.g., /app/inputs/FFmpeg
+SAMPLES_DIR = os.path.join(INPUT_DIR, "fate-samples")
 
-# Output Directory (Mounted from Host)
-# All CSVs, Logs, and JSONs will go here so they persist on your laptop.
-RESULTS_DIR = os.path.join(BASE_DIR, "vfec_results")
-LOG_DIR = os.path.join(RESULTS_DIR, "log")
-CACHE_DIR = os.path.join(LOG_DIR, "cache") # As requested: log/cache
+# Output Paths
+LOG_DIR = os.path.join(OUTPUT_DIR, "log")
+CACHE_DIR = os.path.join(LOG_DIR, "cache") # Checkpoints: /app/output/log/cache
 
-# Setup Directories
-for d in [RESULTS_DIR, LOG_DIR, CACHE_DIR]:
+# Ensure directories exist
+for d in [INPUT_DIR, OUTPUT_DIR, LOG_DIR, CACHE_DIR]:
     if not os.path.exists(d): os.makedirs(d)
 
 # Logging Setup
@@ -43,11 +47,14 @@ console.setLevel(logging.INFO)
 logging.getLogger('').addHandler(console)
 
 # ==========================================
-# SHARED HELPERS
+# HELPERS
 # ==========================================
 def run_command(command, cwd, ignore_errors=False):
     try:
-        result = subprocess.run(command, cwd=cwd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        env = os.environ.copy()
+        env["LC_ALL"] = "C"
+        result = subprocess.run(command, cwd=cwd, shell=True, env=env,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         if result.returncode != 0 and not ignore_errors:
             logging.error(f"FAIL: {command}\nSTDERR: {result.stderr.strip()}")
             return False
@@ -61,23 +68,31 @@ def save_json(filepath, data):
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=4)
     except Exception as e:
-        logging.error(f"Failed to save JSON: {e}")
+        logging.error(f"JSON Save Error: {e}")
 
 def load_json(filepath):
     if os.path.exists(filepath):
-        with open(filepath, 'r') as f:
-            return json.load(f)
+        try:
+            with open(filepath, 'r') as f:
+                return json.load(f)
+        except:
+            return {}
     return {}
 
 def clean_repo(cwd):
-    """Resets the repo to clean state."""
-    # WARNING: This wipes untracked files in the mounted directory!
     run_command("git reset --hard", cwd)
     run_command("git clean -fdx", cwd)
 
-# ==========================================
-# PHASE 1: COVERAGE
-# ==========================================
+def download_csv_if_missing():
+    if not os.path.exists(INPUT_CSV):
+        print(f"Downloading input CSV from Gist to {INPUT_CSV}...")
+        try:
+            urllib.request.urlretrieve(GIST_CSV_URL, INPUT_CSV)
+            print("Download complete.")
+        except Exception as e:
+            print(f"Error downloading CSV: {e}")
+            sys.exit(1)
+
 def get_git_diff_files(cwd, commit_hash):
     cmd = f"git diff-tree --no-commit-id --name-only -r {commit_hash}"
     result = subprocess.run(cmd, cwd=cwd, shell=True, stdout=subprocess.PIPE, text=True)
@@ -85,13 +100,14 @@ def get_git_diff_files(cwd, commit_hash):
 
 def get_fate_tests(cwd):
     if not os.path.exists(SAMPLES_DIR) or not os.listdir(SAMPLES_DIR):
-        logging.warning(f"SAMPLES_DIR seems empty at {SAMPLES_DIR}. Tests may fail.")
-
-    logging.info("Fetching FATE tests...")
+        logging.warning(f"SAMPLES_DIR ({SAMPLES_DIR}) is empty or missing! Tests will fail.")
+    
     res = subprocess.run("make fate-list", cwd=cwd, shell=True, stdout=subprocess.PIPE, text=True)
     tests = [l.strip() for l in res.stdout.split('\n') if l.strip().startswith("fate-")]
-    if TEST_LIMIT: tests = tests[:TEST_LIMIT]
-    # -j$(nproc) for fast coverage compilation/run
+    
+    if TEST_LIMIT: 
+        tests = tests[:TEST_LIMIT]
+        
     return [{"name": t, "cmd": f"make {t} SAMPLES={SAMPLES_DIR} -j$(nproc)"} for t in tests]
 
 def get_covered_files(cwd):
@@ -105,16 +121,42 @@ def get_covered_files(cwd):
                 covered.add(full_path)
     return list(covered)
 
-def run_phase_1_coverage(vuln_commit, fix_commit, output_csv_path, checkpoint_path):
-    logging.info(f"--- Phase 1: Coverage for Pair {vuln_commit} -> {fix_commit} ---")
+def flush_buffer_to_csv(filepath, buffer, fieldnames):
+    if not buffer: return
+    
+    file_exists = os.path.exists(filepath)
+    mode = 'a'
+    try:
+        with open(filepath, mode, newline='') as f:
+            writer = csv.writer(f)
+            if not file_exists:
+                writer.writerow(fieldnames)
+            writer.writerows(buffer)
+            f.flush()
+            os.fsync(f.fileno())
+        buffer.clear()
+    except Exception as e:
+        logging.error(f"Failed to write CSV: {e}")
+
+# ==========================================
+# PHASE 1: COVERAGE
+# ==========================================
+def run_phase_1_coverage(vuln, fix, master_csv_path, checkpoint_path):
+    # Resume Check
+    if os.path.exists(master_csv_path):
+        with open(master_csv_path, 'r') as f:
+            if f"{vuln},{fix}" in f.read():
+                logging.info(f"Skipping P1 for {vuln}->{fix} (Found in Master CSV)")
+                return True
+
+    logging.info(f"--- Phase 1: Coverage {vuln} -> {fix} ---")
     
     clean_repo(PROJECT_DIR)
-    run_command(f"git checkout -f {fix_commit}", PROJECT_DIR)
-    target_files = get_git_diff_files(PROJECT_DIR, fix_commit)
-    logging.info(f"Target Files: {target_files}")
+    run_command(f"git checkout -f {fix}", PROJECT_DIR)
+    target_files = get_git_diff_files(PROJECT_DIR, fix)
     
     if not target_files:
-        logging.error("No target files found. Skipping pair.")
+        logging.error("No target files found in git diff.")
         return False
 
     cached_data = load_json(checkpoint_path)
@@ -122,9 +164,9 @@ def run_phase_1_coverage(vuln_commit, fix_commit, output_csv_path, checkpoint_pa
 
     # A. VULN COMMIT
     if cached_data.get("status") != "COMPLETE":
-        logging.info(f"Building Vuln {vuln_commit} (Coverage)...")
+        logging.info(f"Building Vuln {vuln} (Coverage)...")
         clean_repo(PROJECT_DIR)
-        run_command(f"git checkout -f {vuln_commit}", PROJECT_DIR)
+        run_command(f"git checkout -f {vuln}", PROJECT_DIR)
         run_command("./configure --disable-asm --disable-doc --extra-cflags='--coverage' --extra-ldflags='--coverage'", PROJECT_DIR)
         run_command("make -j$(nproc)", PROJECT_DIR)
         
@@ -135,7 +177,7 @@ def run_phase_1_coverage(vuln_commit, fix_commit, output_csv_path, checkpoint_pa
             t_name = test['name']
             if t_name in vuln_results: continue
             
-            if i % 10 == 0: print(f"  [P1-Vuln] {i}/{len(suite)}: {t_name}")
+            if i % 20 == 0: print(f"  [P1-Vuln] {i}/{len(suite)}: {t_name}")
             
             run_command("find . -name '*.gcda' -delete", PROJECT_DIR)
             run_command(test['cmd'], PROJECT_DIR, ignore_errors=True)
@@ -148,29 +190,22 @@ def run_phase_1_coverage(vuln_commit, fix_commit, output_csv_path, checkpoint_pa
                 save_json(checkpoint_path, {"status": "IN_PROGRESS", "results": vuln_results})
         
         save_json(checkpoint_path, {"status": "COMPLETE", "results": vuln_results})
-    else:
-        logging.info("Vuln phase loaded from checkpoint.")
 
     # B. FIX COMMIT
-    logging.info(f"Building Fix {fix_commit} (Coverage)...")
+    logging.info(f"Building Fix {fix} (Coverage)...")
     clean_repo(PROJECT_DIR)
-    run_command(f"git checkout -f {fix_commit}", PROJECT_DIR)
+    run_command(f"git checkout -f {fix}", PROJECT_DIR)
     run_command("./configure --disable-asm --disable-doc --extra-cflags='--coverage' --extra-ldflags='--coverage'", PROJECT_DIR)
     run_command("make -j$(nproc)", PROJECT_DIR)
 
-    f_csv = open(output_csv_path, mode='w', newline='')
-    writer = csv.writer(f_csv)
-    writer.writerow(["project", "vuln_commit", "v_testname", "fix_commit", "f_testname", "sourcefile"])
-    
     suite = get_fate_tests(PROJECT_DIR)
-    processed_tests = set()
-
+    csv_buffer = []
+    csv_header = ["project", "vuln_commit", "v_testname", "fix_commit", "f_testname", "sourcefile"]
+    
     print(f"Running {len(suite)} tests for Fix Commit...")
     for i, test in enumerate(suite):
         t_name = test['name']
-        processed_tests.add(t_name)
-        
-        if i % 10 == 0: print(f"  [P1-Fix] {i}/{len(suite)}: {t_name}")
+        if i % 20 == 0: print(f"  [P1-Fix] {i}/{len(suite)}: {t_name}")
 
         run_command("find . -name '*.gcda' -delete", PROJECT_DIR)
         run_command(test['cmd'], PROJECT_DIR, ignore_errors=True)
@@ -184,24 +219,19 @@ def run_phase_1_coverage(vuln_commit, fix_commit, output_csv_path, checkpoint_pa
             if v_covered or f_covered:
                 v_entry = t_name if v_covered else ""
                 f_entry = t_name if f_covered else ""
-                writer.writerow([REPO_NAME, vuln_commit, v_entry, fix_commit, f_entry, target])
-                f_csv.flush()
+                csv_buffer.append([REPO_NAME, vuln, v_entry, fix, f_entry, target])
 
-    for t_name, covered_files in vuln_results.items():
-        if t_name not in processed_tests:
-            for target in target_files:
-                if target in covered_files:
-                    writer.writerow([REPO_NAME, vuln_commit, t_name, fix_commit, "", target])
+        if len(csv_buffer) >= CSV_WRITE_INTERVAL:
+            flush_buffer_to_csv(master_csv_path, csv_buffer, csv_header)
 
-    f_csv.close()
+    flush_buffer_to_csv(master_csv_path, csv_buffer, csv_header)
     return True
 
 # ==========================================
 # PHASE 2: ENERGY
 # ==========================================
 def detect_rapl():
-    cmd = "perf list"
-    res = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, text=True)
+    res = subprocess.run("perf list", shell=True, stdout=subprocess.PIPE, text=True)
     out = res.stdout
     pkg = "power/energy-pkg/" if "power/energy-pkg/" in out else "power/energy-pkg"
     core = "power/energy-cores/" if "power/energy-cores/" in out else "power/energy-cores"
@@ -239,62 +269,32 @@ def measure_test(test_name, pkg_event, core_event):
         return {k: v / iterations for k, v in metrics.items()}
     return None
 
-def write_energy_csv(output_path, rows, cache):
-    fieldnames = [
-        "project", "vuln_commit", "v_testname", "v_energy_pkg", "v_energy_core", "v_cycles", "v_ipc",
-        "fix_commit", "f_testname", "sourcefile", "f_energy_pkg", "f_energy_core", "f_cycles", "f_ipc"
-    ]
-    with open(output_path, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in rows:
-            out = row.copy()
-            # Default 0
-            for k in ["v_energy_pkg", "v_energy_core", "v_cycles", "v_ipc", "f_energy_pkg", "f_energy_core", "f_cycles", "f_ipc"]: out[k] = 0
-            
-            vc, vt = row['vuln_commit'], row['v_testname']
-            if vt and vc in cache and vt in cache[vc]:
-                m = cache[vc][vt]
-                out["v_energy_pkg"] = f"{m['energy_pkg']:.4f}"
-                out["v_energy_core"] = f"{m['energy_core']:.4f}"
-                out["v_cycles"] = f"{m['cycles']:.0f}"
-                out["v_ipc"] = f"{m['instructions']/m['cycles']:.4f}" if m['cycles'] > 0 else "0"
-
-            fc, ft = row['fix_commit'], row['f_testname']
-            if ft and fc in cache and ft in cache[fc]:
-                m = cache[fc][ft]
-                out["f_energy_pkg"] = f"{m['energy_pkg']:.4f}"
-                out["f_energy_core"] = f"{m['energy_core']:.4f}"
-                out["f_cycles"] = f"{m['cycles']:.0f}"
-                out["f_ipc"] = f"{m['instructions']/m['cycles']:.4f}" if m['cycles'] > 0 else "0"
-            
-            writer.writerow(out)
-            f.flush()
-            os.fsync(f.fileno())
-
-def run_phase_2_energy(input_csv_path, output_csv_path, checkpoint_path):
-    logging.info(f"--- Phase 2: Energy Measurement for {input_csv_path} ---")
+def run_phase_2_energy(master_p1_csv, master_p2_csv, checkpoint_path, current_vuln, current_fix):
+    logging.info(f"--- Phase 2: Energy {current_vuln} -> {current_fix} ---")
     
     if os.geteuid() != 0:
-        logging.error("Phase 2 requires root (sudo).")
+        logging.error("Phase 2 requires root permissions.")
         return False
 
-    if not os.path.exists(input_csv_path):
-        logging.error(f"Input CSV {input_csv_path} not found.")
-        return False
+    relevant_rows = []
+    if os.path.exists(master_p1_csv):
+        with open(master_p1_csv, 'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row['vuln_commit'] == current_vuln and row['fix_commit'] == current_fix:
+                    relevant_rows.append(row)
+    
+    if not relevant_rows:
+        logging.info("No coverage found for this pair. Skipping measurement.")
+        return True
 
     EVENT_PKG, EVENT_CORE = detect_rapl()
-    
-    with open(input_csv_path, 'r') as f:
-        rows = list(csv.DictReader(f))
+    cache = load_json(checkpoint_path)
 
     tasks = {}
-    for row in rows:
-        if row['v_testname']: tasks.setdefault(row['vuln_commit'], set()).add(row['v_testname'])
-        if row['f_testname']: tasks.setdefault(row['fix_commit'], set()).add(row['f_testname'])
-
-    cache = load_json(checkpoint_path)
-    counter = 0
+    for row in relevant_rows:
+        if row['v_testname']: tasks.setdefault(current_vuln, set()).add(row['v_testname'])
+        if row['f_testname']: tasks.setdefault(current_fix, set()).add(row['f_testname'])
 
     for commit, test_set in tasks.items():
         if commit not in cache: cache[commit] = {}
@@ -302,7 +302,7 @@ def run_phase_2_energy(input_csv_path, output_csv_path, checkpoint_path):
         
         if not todos: continue
         
-        logging.info(f"Building {commit} for Perf (No Coverage)...")
+        logging.info(f"Building {commit} (Standard)...")
         clean_repo(PROJECT_DIR)
         run_command(f"git checkout -f {commit}", PROJECT_DIR)
         run_command("./configure --disable-asm --disable-doc", PROJECT_DIR)
@@ -314,57 +314,83 @@ def run_phase_2_energy(input_csv_path, output_csv_path, checkpoint_path):
             if metrics:
                 cache[commit][test] = metrics
                 save_json(checkpoint_path, cache)
-                counter += 1
-                if counter % CSV_WRITE_INTERVAL == 0:
-                    write_energy_csv(output_csv_path, rows, cache)
 
-    write_energy_csv(output_csv_path, rows, cache)
+    csv_buffer = []
+    csv_header = [
+        "project", "vuln_commit", "v_testname", "v_energy_pkg", "v_energy_core", "v_cycles", "v_ipc",
+        "fix_commit", "f_testname", "sourcefile", "f_energy_pkg", "f_energy_core", "f_cycles", "f_ipc"
+    ]
+
+    for row in relevant_rows:
+        v_pkg, v_core, v_cyc, v_ipc = "0", "0", "0", "0"
+        vc, vt = row['vuln_commit'], row['v_testname']
+        if vt and vc in cache and vt in cache[vc]:
+            m = cache[vc][vt]
+            v_pkg = f"{m['energy_pkg']:.4f}"
+            v_core = f"{m['energy_core']:.4f}"
+            v_cyc = f"{m['cycles']:.0f}"
+            v_ipc = f"{m['instructions']/m['cycles']:.4f}" if m['cycles'] > 0 else "0"
+
+        f_pkg, f_core, f_cyc, f_ipc = "0", "0", "0", "0"
+        fc, ft = row['fix_commit'], row['f_testname']
+        if ft and fc in cache and ft in cache[fc]:
+            m = cache[fc][ft]
+            f_pkg = f"{m['energy_pkg']:.4f}"
+            f_core = f"{m['energy_core']:.4f}"
+            f_cyc = f"{m['cycles']:.0f}"
+            f_ipc = f"{m['instructions']/m['cycles']:.4f}" if m['cycles'] > 0 else "0"
+
+        csv_buffer.append([
+            row['project'], row['vuln_commit'], row['v_testname'], 
+            v_pkg, v_core, v_cyc, v_ipc,
+            row['fix_commit'], row['f_testname'], row['sourcefile'],
+            f_pkg, f_core, f_cyc, f_ipc
+        ])
+
+    flush_buffer_to_csv(master_p2_csv, csv_buffer, csv_header)
     return True
 
 # ==========================================
-# MAIN LOOP
+# MAIN
 # ==========================================
 def main():
-    if not os.path.exists(INPUT_CSV):
-        print(f"ERROR: Input CSV file not found at {INPUT_CSV}")
-        print("Please ensure it was copied into the container.")
-        sys.exit(1)
+    download_csv_if_missing()
 
-    print(f"Reading commit pairs from {INPUT_CSV}...")
+    MASTER_P1_CSV = os.path.join(OUTPUT_DIR, f"{REPO_NAME}_MASTER_testCompile.csv")
+    MASTER_P2_CSV = os.path.join(OUTPUT_DIR, f"{REPO_NAME}_MASTER_energyperf.csv")
     
     pairs = []
-    with open(INPUT_CSV, 'r') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            if 'vuln_commit' in row and 'fix_commit' in row:
-                pairs.append((row['vuln_commit'], row['fix_commit']))
-
-    if not pairs:
-        print("No pairs found in CSV.")
+    print(f"Reading {INPUT_CSV} for project: {REPO_NAME}...")
+    try:
+        with open(INPUT_CSV, 'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get('project') == REPO_NAME and 'vuln_commit' in row and 'fix_commit' in row:
+                    pairs.append((row['vuln_commit'], row['fix_commit']))
+    except Exception as e:
+        print(f"Error reading input CSV: {e}")
         sys.exit(1)
 
-    print(f"Found {len(pairs)} pairs to process.")
+    if not pairs:
+        print(f"No pairs found for project '{REPO_NAME}'.")
+        sys.exit(1)
+
+    print(f"Found {len(pairs)} pairs for {REPO_NAME}.")
+    print(f"Outputs will be at: {OUTPUT_DIR}")
 
     for i, (vuln, fix) in enumerate(pairs):
-        print(f"\n==================================================")
-        print(f"PROCESSING PAIR {i+1}/{len(pairs)}: {vuln[:8]} -> {fix[:8]}")
-        print(f"==================================================\n")
-
-        # Define Output Filenames (Inside /app/vfec_results so they are exposed to host)
-        p1_csv = os.path.join(RESULTS_DIR, f"FFmpeg_{vuln[:8]}_{fix[:8]}_testCompile.csv")
-        p2_csv = os.path.join(RESULTS_DIR, f"FFmpeg_{vuln[:8]}_{fix[:8]}_energyperf.csv")
+        print(f"\n[{i+1}/{len(pairs)}] Processing Pair: {vuln[:8]} -> {fix[:8]}")
         
         p1_cache = os.path.join(CACHE_DIR, f"ckpt_cov_{vuln[:8]}.json")
         p2_cache = os.path.join(CACHE_DIR, f"ckpt_eng_{vuln[:8]}_{fix[:8]}.json")
 
-        success_p1 = run_phase_1_coverage(vuln, fix, p1_csv, p1_cache)
+        success_p1 = run_phase_1_coverage(vuln, fix, MASTER_P1_CSV, p1_cache)
         
         if success_p1:
-            print("Phase 1 complete. Starting Phase 2...")
-            run_phase_2_energy(p1_csv, p2_csv, p2_cache)
-            print(f"Pair Complete. Final Result: {p2_csv}")
+            run_phase_2_energy(MASTER_P1_CSV, MASTER_P2_CSV, p2_cache, vuln, fix)
+            print(f"Pair {i+1} Completed.")
         else:
-            print("Phase 1 failed. Skipping Phase 2 for this pair.")
+            print("Skipping Phase 2 due to P1 failure.")
 
 if __name__ == "__main__":
     main()
