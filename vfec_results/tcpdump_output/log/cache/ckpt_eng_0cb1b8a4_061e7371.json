@@ -1,0 +1,1564 @@
+{
+    "0cb1b8a434b599b8d636db029aadb757c24e39d6": {
+        "vxlan": {
+            "energy_pkg": 1.46875,
+            "energy_core": 0.9595833333333333,
+            "cycles": 41759303.5,
+            "instructions": 34095324.458333336
+        },
+        "kday2": {
+            "energy_pkg": 1.3632,
+            "energy_core": 0.8708,
+            "cycles": 30465709.24,
+            "instructions": 29735952.44
+        },
+        "dccp_partial_csum_v6_longer": {
+            "energy_pkg": 0.98,
+            "energy_core": 0.6079411764705883,
+            "cycles": 20086456.352941178,
+            "instructions": 18029789.911764707
+        },
+        "bgp_mvpn_6_and_7": {
+            "energy_pkg": 2.61,
+            "energy_core": 1.707857142857143,
+            "cycles": 63904684.85714286,
+            "instructions": 70092089.14285715
+        },
+        "icmp-cksum-oobr-4": {
+            "energy_pkg": 2.0752941176470587,
+            "energy_core": 1.3458823529411763,
+            "cycles": 50323080.058823526,
+            "instructions": 52695057.294117644
+        },
+        "isis-seg-fault-2-v": {
+            "energy_pkg": 1.1106451612903225,
+            "energy_core": 0.7025806451612904,
+            "cycles": 25488418.032258064,
+            "instructions": 25280796.741935484
+        },
+        "bfd-raw-auth-simple-v": {
+            "energy_pkg": 1.6017391304347828,
+            "energy_core": 1.046521739130435,
+            "cycles": 64902272.86956522,
+            "instructions": 161100135.73913044
+        },
+        "spb": {
+            "energy_pkg": 0.6631999999999999,
+            "energy_core": 0.4072,
+            "cycles": 14332171.2,
+            "instructions": 12391386.94
+        },
+        "ieee802.11_rates_oobr": {
+            "energy_pkg": 1.8805263157894736,
+            "energy_core": 1.2205263157894737,
+            "cycles": 44197241.21052632,
+            "instructions": 47269004.94736842
+        },
+        "babel1v": {
+            "energy_pkg": 0.5761666666666667,
+            "energy_core": 0.35433333333333333,
+            "cycles": 12357032.4,
+            "instructions": 11199814.466666667
+        },
+        "bgp-shutdown-communication": {
+            "energy_pkg": 0.2842477876106195,
+            "energy_core": 0.16964601769911505,
+            "cycles": 5860873.761061947,
+            "instructions": 4992351.876106195
+        },
+        "isis_stlv_asan-2": {
+            "energy_pkg": 2.494285714285714,
+            "energy_core": 1.6457142857142857,
+            "cycles": 64756900.71428572,
+            "instructions": 73532948.0
+        },
+        "ospf-gmpls": {
+            "energy_pkg": 0.4011904761904762,
+            "energy_core": 0.24273809523809525,
+            "cycles": 8812802.30952381,
+            "instructions": 7057765.702380952
+        },
+        "ldp_infloop": {
+            "energy_pkg": 0.34368421052631576,
+            "energy_core": 0.2061052631578947,
+            "cycles": 6557578.757894737,
+            "instructions": 5642693.568421053
+        },
+        "mptcp": {
+            "energy_pkg": 0.8332499999999999,
+            "energy_core": 0.512,
+            "cycles": 14925131.325,
+            "instructions": 13625671.8
+        },
+        "atm-heapoverflow": {
+            "energy_pkg": 1.8042105263157895,
+            "energy_core": 1.1636842105263157,
+            "cycles": 41446339.84210526,
+            "instructions": 42623079.578947365
+        },
+        "dhcp-rfc3004": {
+            "energy_pkg": 1.3523076923076922,
+            "energy_core": 0.88,
+            "cycles": 37004135.92307692,
+            "instructions": 40251080.23076923
+        },
+        "pgm_zmtp1v": {
+            "energy_pkg": 0.8716666666666667,
+            "energy_core": 0.5561904761904761,
+            "cycles": 26221555.64285714,
+            "instructions": 25505945.64285714
+        },
+        "mobility_opt_asan_6": {
+            "energy_pkg": 2.6357142857142857,
+            "energy_core": 1.772857142857143,
+            "cycles": 87259065.28571428,
+            "instructions": 105470570.14285715
+        },
+        "forces01vvvv": {
+            "energy_pkg": 0.5287301587301587,
+            "energy_core": 0.3223809523809524,
+            "cycles": 10685796.92063492,
+            "instructions": 9520748.761904761
+        },
+        "igmpv2": {
+            "energy_pkg": 0.6317307692307692,
+            "energy_core": 0.3894230769230769,
+            "cycles": 13276887.115384616,
+            "instructions": 12145332.615384616
+        },
+        "ikev2fourv": {
+            "energy_pkg": 0.456986301369863,
+            "energy_core": 0.27684931506849314,
+            "cycles": 9763207.95890411,
+            "instructions": 9273937.06849315
+        },
+        "hoobr_aodv_extension": {
+            "energy_pkg": 1.9594117647058824,
+            "energy_core": 1.2482352941176469,
+            "cycles": 43446081.5882353,
+            "instructions": 41293381.64705882
+        },
+        "isakmp3": {
+            "energy_pkg": 0.3170192307692308,
+            "energy_core": 0.18942307692307692,
+            "cycles": 6183542.567307692,
+            "instructions": 4830921.5
+        },
+        "pim_header_asan": {
+            "energy_pkg": 2.4857142857142853,
+            "energy_core": 1.6364285714285713,
+            "cycles": 62213462.428571425,
+            "instructions": 69950555.71428572
+        },
+        "hoobr_pimv1": {
+            "energy_pkg": 1.927777777777778,
+            "energy_core": 1.2594444444444446,
+            "cycles": 49589937.55555555,
+            "instructions": 53232124.666666664
+        },
+        "olsrv1_1": {
+            "energy_pkg": 1.3820833333333333,
+            "energy_core": 0.8775,
+            "cycles": 29952056.708333332,
+            "instructions": 28824044.041666668
+        },
+        "dccp_partial_csum_v4_longer": {
+            "energy_pkg": 0.9665714285714285,
+            "energy_core": 0.6062857142857142,
+            "cycles": 23489669.77142857,
+            "instructions": 22156304.6
+        },
+        "heap-overflow-2": {
+            "energy_pkg": 1.583181818181818,
+            "energy_core": 1.018181818181818,
+            "cycles": 38529586.36363637,
+            "instructions": 39276758.86363637
+        },
+        "mobility_opt_asan_8": {
+            "energy_pkg": 2.434285714285714,
+            "energy_core": 1.5999999999999999,
+            "cycles": 60529153.0,
+            "instructions": 67935622.92857143
+        },
+        "isis_poi-v": {
+            "energy_pkg": 1.0693939393939393,
+            "energy_core": 0.6727272727272727,
+            "cycles": 26254872.242424242,
+            "instructions": 25448893.90909091
+        },
+        "lmp": {
+            "energy_pkg": 0.3295,
+            "energy_core": 0.198,
+            "cycles": 7465340.39,
+            "instructions": 6421591.96
+        },
+        "ip_printroute_asan": {
+            "energy_pkg": 2.3993333333333333,
+            "energy_core": 1.5753333333333333,
+            "cycles": 62713755.93333333,
+            "instructions": 70403201.66666667
+        },
+        "calm-fast-mac-lookup-heapoverflow": {
+            "energy_pkg": 1.650952380952381,
+            "energy_core": 1.0704761904761906,
+            "cycles": 39443633.23809524,
+            "instructions": 43157271.952380955
+        },
+        "snmp-heapoverflow-1": {
+            "energy_pkg": 1.8638888888888887,
+            "energy_core": 1.2027777777777777,
+            "cycles": 41099751.94444445,
+            "instructions": 43083516.44444445
+        },
+        "isoclns-oobr": {
+            "energy_pkg": 1.9188888888888889,
+            "energy_core": 1.2383333333333333,
+            "cycles": 44552990.333333336,
+            "instructions": 46829838.05555555
+        },
+        "isis_poi2-v": {
+            "energy_pkg": 1.0796875,
+            "energy_core": 0.684375,
+            "cycles": 23736293.9375,
+            "instructions": 24153875.03125
+        },
+        "dhcpv6-mud": {
+            "energy_pkg": 0.7948837209302325,
+            "energy_core": 0.49465116279069765,
+            "cycles": 18446659.744186047,
+            "instructions": 17973340.837209303
+        },
+        "relts-0x80000000": {
+            "energy_pkg": 1.7921052631578946,
+            "energy_core": 1.1547368421052633,
+            "cycles": 41200935.368421055,
+            "instructions": 42635090.368421055
+        },
+        "rtp-seg-fault-2": {
+            "energy_pkg": 2.9,
+            "energy_core": 1.9383333333333335,
+            "cycles": 93077014.83333333,
+            "instructions": 86925583.0
+        },
+        "isis_sysid_asan": {
+            "energy_pkg": 2.517333333333333,
+            "energy_core": 1.662,
+            "cycles": 68888595.4,
+            "instructions": 79224898.2
+        },
+        "dhcpv6-ia-na": {
+            "energy_pkg": 0.8262222222222222,
+            "energy_core": 0.5304444444444445,
+            "cycles": 25358211.755555555,
+            "instructions": 26181279.777777776
+        },
+        "epgm_zmtp1v": {
+            "energy_pkg": 0.8278048780487804,
+            "energy_core": 0.5153658536585366,
+            "cycles": 18285066.390243903,
+            "instructions": 17187515.31707317
+        },
+        "print-A": {
+            "energy_pkg": 0.2557983193277311,
+            "energy_core": 0.15781512605042017,
+            "cycles": 7675739.831932773,
+            "instructions": 7854035.647058823
+        },
+        "kday1": {
+            "energy_pkg": 1.3784615384615386,
+            "energy_core": 0.8915384615384615,
+            "cycles": 32885580.5,
+            "instructions": 34972064.15384615
+        },
+        "ipv6-bad-version": {
+            "energy_pkg": 0.9197222222222222,
+            "energy_core": 0.5702777777777778,
+            "cycles": 18497884.638888888,
+            "instructions": 16538964.833333334
+        },
+        "dccp_partial_csum_v6_simple": {
+            "energy_pkg": 0.962857142857143,
+            "energy_core": 0.6025714285714285,
+            "cycles": 20040113.742857143,
+            "instructions": 19278984.6
+        },
+        "vtp_asan-2": {
+            "energy_pkg": 2.3146666666666667,
+            "energy_core": 1.4986666666666666,
+            "cycles": 56595722.4,
+            "instructions": 58748556.2
+        },
+        "dhcp6_reconf_asan": {
+            "energy_pkg": 2.3253333333333335,
+            "energy_core": 1.5273333333333334,
+            "cycles": 61394810.4,
+            "instructions": 67671098.13333334
+        },
+        "cve-2014-8767-OLSR": {
+            "energy_pkg": 1.3265384615384617,
+            "energy_core": 0.8476923076923076,
+            "cycles": 30153110.0,
+            "instructions": 30553402.46153846
+        },
+        "pgmv": {
+            "energy_pkg": 0.7895238095238094,
+            "energy_core": 0.48595238095238097,
+            "cycles": 16638338.92857143,
+            "instructions": 14960902.476190476
+        },
+        "lmpv1_busyloop": {
+            "energy_pkg": 2.2325,
+            "energy_core": 1.46625,
+            "cycles": 60345198.125,
+            "instructions": 65706743.1875
+        },
+        "resp_3": {
+            "energy_pkg": 1.525,
+            "energy_core": 0.9804545454545455,
+            "cycles": 34259502.18181818,
+            "instructions": 36096576.54545455
+        },
+        "802_15_4-oobr-1": {
+            "energy_pkg": 2.161875,
+            "energy_core": 1.396875,
+            "cycles": 48846728.6875,
+            "instructions": 49782626.75
+        },
+        "heap-overflow-1": {
+            "energy_pkg": 1.545909090909091,
+            "energy_core": 0.9886363636363636,
+            "cycles": 36421222.86363637,
+            "instructions": 36015333.18181818
+        },
+        "ipv6-mobility-header-oobr": {
+            "energy_pkg": 1.8310526315789473,
+            "energy_core": 1.1726315789473685,
+            "cycles": 40829015.21052632,
+            "instructions": 40781972.10526316
+        },
+        "eapon1": {
+            "energy_pkg": 0.29168141592920355,
+            "energy_core": 0.17442477876106197,
+            "cycles": 5963158.265486726,
+            "instructions": 4948772.849557522
+        },
+        "ipcomp-heapoverflow": {
+            "energy_pkg": 1.6980952380952379,
+            "energy_core": 1.0942857142857143,
+            "cycles": 41152057.71428572,
+            "instructions": 44271812.76190476
+        },
+        "isis-areaaddr-oobr-2": {
+            "energy_pkg": 2.176875,
+            "energy_core": 1.40875,
+            "cycles": 53598894.8125,
+            "instructions": 66540194.25
+        },
+        "hoobr_juniper2": {
+            "energy_pkg": 1.9505882352941175,
+            "energy_core": 1.263529411764706,
+            "cycles": 44902882.0,
+            "instructions": 47982479.23529412
+        },
+        "pimv2-oobr-3": {
+            "energy_pkg": 2.280666666666667,
+            "energy_core": 1.4933333333333332,
+            "cycles": 61475126.53333333,
+            "instructions": 79522262.26666667
+        },
+        "epgmv": {
+            "energy_pkg": 0.8048780487804879,
+            "energy_core": 0.49756097560975604,
+            "cycles": 16956822.87804878,
+            "instructions": 15878357.512195121
+        },
+        "resp_1": {
+            "energy_pkg": 1.5256521739130435,
+            "energy_core": 0.9852173913043478,
+            "cycles": 35751389.13043478,
+            "instructions": 38129673.217391305
+        },
+        "msnlb": {
+            "energy_pkg": 0.8244999999999999,
+            "energy_core": 0.51025,
+            "cycles": 16876803.35,
+            "instructions": 15068197.425
+        },
+        "ipv6-routing-header": {
+            "energy_pkg": 0.9583333333333334,
+            "energy_core": 0.6038888888888888,
+            "cycles": 23199459.166666668,
+            "instructions": 22697487.361111112
+        },
+        "pgm_opts_asan_2": {
+            "energy_pkg": 2.3393333333333337,
+            "energy_core": 1.536,
+            "cycles": 58397823.4,
+            "instructions": 66076645.733333334
+        },
+        "cve2015-0261_01": {
+            "energy_pkg": 1.4391999999999998,
+            "energy_core": 0.9351999999999999,
+            "cycles": 37959846.36,
+            "instructions": 41165931.68
+        },
+        "hsrp_1-v": {
+            "energy_pkg": 0.995,
+            "energy_core": 0.6220588235294118,
+            "cycles": 21580915.29411765,
+            "instructions": 20280310.411764707
+        },
+        "hdlc1": {
+            "energy_pkg": 1.172,
+            "energy_core": 0.755,
+            "cycles": 32614888.0,
+            "instructions": 32485186.2
+        },
+        "juniper_es": {
+            "energy_pkg": 2.286875,
+            "energy_core": 1.509375,
+            "cycles": 60771997.1875,
+            "instructions": 68839795.8125
+        },
+        "stp-heapoverflow-4": {
+            "energy_pkg": 1.7557894736842106,
+            "energy_core": 1.1357894736842105,
+            "cycles": 39405722.21052632,
+            "instructions": 42205748.526315786
+        },
+        "beep-oobr": {
+            "energy_pkg": 1.827894736842105,
+            "energy_core": 1.1742105263157894,
+            "cycles": 41146088.473684214,
+            "instructions": 42272227.94736842
+        },
+        "loopback": {
+            "energy_pkg": 0.9469444444444446,
+            "energy_core": 0.5894444444444444,
+            "cycles": 19378648.277777776,
+            "instructions": 18788568.111111112
+        },
+        "dcb_pfc": {
+            "energy_pkg": 0.6785714285714286,
+            "energy_core": 0.4144897959183673,
+            "cycles": 13926098.06122449,
+            "instructions": 12186126.93877551
+        },
+        "mobility_opt_asan": {
+            "energy_pkg": 2.268666666666667,
+            "energy_core": 1.4493333333333331,
+            "cycles": 49852877.4,
+            "instructions": 48122872.93333333
+        },
+        "tok2str-oobr-1": {
+            "energy_pkg": 2.140625,
+            "energy_core": 1.410625,
+            "cycles": 56322458.375,
+            "instructions": 65940584.4375
+        },
+        "tfo": {
+            "energy_pkg": 0.8550000000000001,
+            "energy_core": 0.53275,
+            "cycles": 18138685.15,
+            "instructions": 17051369.4
+        },
+        "zmtp1v": {
+            "energy_pkg": 0.7944186046511628,
+            "energy_core": 0.4923255813953489,
+            "cycles": 17303052.209302325,
+            "instructions": 15804012.139534883
+        },
+        "decnet-shorthdr-oobr": {
+            "energy_pkg": 1.8668421052631579,
+            "energy_core": 1.221578947368421,
+            "cycles": 49004739.526315786,
+            "instructions": 54195240.315789476
+        },
+        "ahcp-vv": {
+            "energy_pkg": 0.5576666666666666,
+            "energy_core": 0.3436666666666667,
+            "cycles": 12597704.633333333,
+            "instructions": 11278088.8
+        },
+        "stp-v": {
+            "energy_pkg": 0.7204166666666666,
+            "energy_core": 0.44687499999999997,
+            "cycles": 15588643.375,
+            "instructions": 13944536.875
+        },
+        "pgm_group_addr_asan": {
+            "energy_pkg": 2.334,
+            "energy_core": 1.532,
+            "cycles": 59007454.4,
+            "instructions": 66534567.93333333
+        },
+        "mobility_opt_asan_7": {
+            "energy_pkg": 2.414,
+            "energy_core": 1.5873333333333333,
+            "cycles": 63898901.86666667,
+            "instructions": 72376326.4
+        },
+        "stp-heapoverflow-3": {
+            "energy_pkg": 1.7405000000000002,
+            "energy_core": 1.1305,
+            "cycles": 42510990.5,
+            "instructions": 45605596.35
+        },
+        "hdlc4": {
+            "energy_pkg": 1.125,
+            "energy_core": 0.7083333333333334,
+            "cycles": 24890753.0,
+            "instructions": 23999060.5
+        },
+        "cve-2014-8768-Geonet": {
+            "energy_pkg": 1.3115384615384615,
+            "energy_core": 0.8361538461538461,
+            "cycles": 28998787.03846154,
+            "instructions": 28680838.653846152
+        },
+        "heapoverflow-EXTRACT_16BITS": {
+            "energy_pkg": 1.55,
+            "energy_core": 0.9922727272727272,
+            "cycles": 35611865.36363637,
+            "instructions": 36445803.54545455
+        },
+        "m3ua": {
+            "energy_pkg": 0.9081081081081082,
+            "energy_core": 0.5678378378378379,
+            "cycles": 19308891.594594594,
+            "instructions": 18420667.54054054
+        },
+        "aoe_1": {
+            "energy_pkg": 1.2992857142857144,
+            "energy_core": 0.8367857142857142,
+            "cycles": 31056928.35714286,
+            "instructions": 33573979.21428572
+        },
+        "mlppp-oobr": {
+            "energy_pkg": 2.6815384615384614,
+            "energy_core": 1.7707692307692307,
+            "cycles": 70339865.3076923,
+            "instructions": 77394304.46153846
+        },
+        "dcb_ets": {
+            "energy_pkg": 0.686734693877551,
+            "energy_core": 0.4224489795918367,
+            "cycles": 14420014.673469387,
+            "instructions": 13690047.653061224
+        },
+        "print-xx": {
+            "energy_pkg": 0.22624113475177304,
+            "energy_core": 0.1346099290780142,
+            "cycles": 5497221.482269503,
+            "instructions": 5463586.517730497
+        },
+        "juniper_header-heapoverflow": {
+            "energy_pkg": 1.8079999999999998,
+            "energy_core": 1.1824999999999999,
+            "cycles": 46205541.1,
+            "instructions": 50820864.45
+        },
+        "hsrp_3-v": {
+            "energy_pkg": 1.0638235294117648,
+            "energy_core": 0.678235294117647,
+            "cycles": 32296917.970588237,
+            "instructions": 31231248.0
+        },
+        "e1000g": {
+            "energy_pkg": 0.5026470588235294,
+            "energy_core": 0.30558823529411766,
+            "cycles": 10673112.61764706,
+            "instructions": 9247565.55882353
+        },
+        "nfs-attr-oobr": {
+            "energy_pkg": 1.901111111111111,
+            "energy_core": 1.221111111111111,
+            "cycles": 42292070.38888889,
+            "instructions": 43166433.44444445
+        },
+        "mstp-v": {
+            "energy_pkg": 0.6897916666666667,
+            "energy_core": 0.42166666666666663,
+            "cycles": 14520116.270833334,
+            "instructions": 12354008.375
+        },
+        "of10_p3295-vv": {
+            "energy_pkg": 0.9023076923076923,
+            "energy_core": 0.5633333333333334,
+            "cycles": 20384947.076923076,
+            "instructions": 20239377.53846154
+        },
+        "ospf6_decode_v3_asan": {
+            "energy_pkg": 2.690714285714286,
+            "energy_core": 1.8035714285714286,
+            "cycles": 88199099.21428572,
+            "instructions": 114742871.5
+        },
+        "lspping-fec-ldp-vv": {
+            "energy_pkg": 0.36597826086956525,
+            "energy_core": 0.22228260869565217,
+            "cycles": 7859455.097826087,
+            "instructions": 6798274.130434782
+        },
+        "nsh-over-vxlan-gpe-vv": {
+            "energy_pkg": 1.4552173913043478,
+            "energy_core": 0.9247826086956522,
+            "cycles": 32464444.739130434,
+            "instructions": 32060717.52173913
+        },
+        "heapoverflow-q933_printq": {
+            "energy_pkg": 1.5768181818181817,
+            "energy_core": 1.0154545454545454,
+            "cycles": 35417899.40909091,
+            "instructions": 36762076.86363637
+        },
+        "802.11_exthdr": {
+            "energy_pkg": 0.866923076923077,
+            "energy_core": 0.5399999999999999,
+            "cycles": 18970747.384615384,
+            "instructions": 18391207.384615384
+        },
+        "isoclns-heapoverflow": {
+            "energy_pkg": 1.6547619047619047,
+            "energy_core": 1.071904761904762,
+            "cycles": 40022789.047619045,
+            "instructions": 42018166.76190476
+        },
+        "medsa-e": {
+            "energy_pkg": 1.3030769230769232,
+            "energy_core": 0.8246153846153846,
+            "cycles": 27219631.692307692,
+            "instructions": 25501267.076923076
+        },
+        "print-AA": {
+            "energy_pkg": 0.24676923076923077,
+            "energy_core": 0.1473076923076923,
+            "cycles": 5241788.776923077,
+            "instructions": 4696942.392307692
+        },
+        "otv-heapoverflow-2": {
+            "energy_pkg": 1.8410526315789473,
+            "energy_core": 1.203157894736842,
+            "cycles": 46241975.84210526,
+            "instructions": 50158232.631578945
+        },
+        "rpki-rtr-oob": {
+            "energy_pkg": 2.677857142857143,
+            "energy_core": 1.7792857142857144,
+            "cycles": 79043282.71428572,
+            "instructions": 92345894.85714285
+        },
+        "nfs-seg-fault-1": {
+            "energy_pkg": 2.6530769230769233,
+            "energy_core": 1.7284615384615383,
+            "cycles": 63780782.538461536,
+            "instructions": 71273205.84615384
+        },
+        "zephyr-oobr": {
+            "energy_pkg": 2.0958823529411768,
+            "energy_core": 1.3629411764705883,
+            "cycles": 50859367.64705882,
+            "instructions": 54895314.4117647
+        },
+        "ipv6hdr-heapoverflow": {
+            "energy_pkg": 1.7457894736842106,
+            "energy_core": 1.118421052631579,
+            "cycles": 42963733.94736842,
+            "instructions": 42706954.421052635
+        },
+        "lspping-fec-rsvp-v": {
+            "energy_pkg": 0.36818181818181817,
+            "energy_core": 0.22090909090909092,
+            "cycles": 7850999.136363637,
+            "instructions": 6425681.784090909
+        },
+        "getname_2_read4_asan": {
+            "energy_pkg": 2.189375,
+            "energy_core": 1.4125,
+            "cycles": 53300317.1875,
+            "instructions": 53660703.0625
+        },
+        "isoclns-heapoverflow-2": {
+            "energy_pkg": 1.8738888888888887,
+            "energy_core": 1.208888888888889,
+            "cycles": 44966928.11111111,
+            "instructions": 46414545.05555555
+        },
+        "arp-oobr": {
+            "energy_pkg": 2.074705882352941,
+            "energy_core": 1.3411764705882354,
+            "cycles": 52241196.705882356,
+            "instructions": 58341141.47058824
+        },
+        "ip6_frag_asan": {
+            "energy_pkg": 2.4657142857142857,
+            "energy_core": 1.6042857142857143,
+            "cycles": 59165869.71428572,
+            "instructions": 63085225.71428572
+        },
+        "hoobr_ripng_print": {
+            "energy_pkg": 2.0076470588235296,
+            "energy_core": 1.3152941176470587,
+            "cycles": 56122593.35294118,
+            "instructions": 62521530.11764706
+        },
+        "mobility_opt_asan_3": {
+            "energy_pkg": 2.3953333333333333,
+            "energy_core": 1.5813333333333333,
+            "cycles": 65469272.6,
+            "instructions": 72100156.73333333
+        },
+        "kday5": {
+            "energy_pkg": 1.4256,
+            "energy_core": 0.9308,
+            "cycles": 42912264.24,
+            "instructions": 43270824.64
+        },
+        "of10_7050sx_bsn-vv": {
+            "energy_pkg": 0.9207894736842106,
+            "energy_core": 0.5792105263157895,
+            "cycles": 21507558.157894738,
+            "instructions": 21342652.710526317
+        },
+        "nbns-valgrind": {
+            "energy_pkg": 2.006470588235294,
+            "energy_core": 1.301764705882353,
+            "cycles": 48123645.176470585,
+            "instructions": 49865055.35294118
+        },
+        "bgp-aigp": {
+            "energy_pkg": 0.27179487179487183,
+            "energy_core": 0.16341880341880344,
+            "cycles": 5354748.068376068,
+            "instructions": 4250121.991452991
+        },
+        "aarp-heapoverflow-1": {
+            "energy_pkg": 1.6957142857142857,
+            "energy_core": 1.0914285714285714,
+            "cycles": 39042347.666666664,
+            "instructions": 38921957.52380952
+        },
+        "hncp_dhcpv6data-oobr": {
+            "energy_pkg": 2.5085714285714285,
+            "energy_core": 1.6385714285714286,
+            "cycles": 62949539.35714286,
+            "instructions": 66696572.071428575
+        },
+        "radiotap-heapoverflow": {
+            "energy_pkg": 1.639047619047619,
+            "energy_core": 1.0552380952380953,
+            "cycles": 37669447.52380952,
+            "instructions": 37697875.0952381
+        },
+        "isakmp5-v": {
+            "energy_pkg": 0.32323529411764707,
+            "energy_core": 0.1946078431372549,
+            "cycles": 6457196.529411765,
+            "instructions": 5280098.68627451
+        },
+        "frf15-heapoverflow": {
+            "energy_pkg": 1.6523809523809525,
+            "energy_core": 1.0614285714285714,
+            "cycles": 37717944.71428572,
+            "instructions": 38049900.571428575
+        },
+        "vtp_asan-3": {
+            "energy_pkg": 2.3033333333333332,
+            "energy_core": 1.494,
+            "cycles": 55579101.8,
+            "instructions": 57445958.2
+        },
+        "ospf3_auth-vv": {
+            "energy_pkg": 0.41294871794871796,
+            "energy_core": 0.25064102564102564,
+            "cycles": 8873810.012820512,
+            "instructions": 7681154.820512821
+        },
+        "m3ua-vv": {
+            "energy_pkg": 0.9338888888888888,
+            "energy_core": 0.5877777777777777,
+            "cycles": 20761234.055555556,
+            "instructions": 19797867.916666668
+        },
+        "isakmp-no-none-np": {
+            "energy_pkg": 2.1388235294117646,
+            "energy_core": 1.411764705882353,
+            "cycles": 54065235.176470585,
+            "instructions": 61525766.76470588
+        },
+        "nsh-over-vxlan-gpe-vvv": {
+            "energy_pkg": 1.5052173913043476,
+            "energy_core": 0.9695652173913044,
+            "cycles": 33729198.347826086,
+            "instructions": 34691969.95652174
+        },
+        "resp_2": {
+            "energy_pkg": 1.4982608695652175,
+            "energy_core": 0.9626086956521739,
+            "cycles": 35286665.39130435,
+            "instructions": 37296386.652173914
+        },
+        "tcp_header_heapoverflow": {
+            "energy_pkg": 1.655714285714286,
+            "energy_core": 1.0604761904761904,
+            "cycles": 38905312.809523806,
+            "instructions": 38669367.952380955
+        },
+        "isis_4-v": {
+            "energy_pkg": 1.1061290322580646,
+            "energy_core": 0.6935483870967742,
+            "cycles": 24938395.548387095,
+            "instructions": 23396752.774193548
+        },
+        "babel_rtt": {
+            "energy_pkg": 0.588103448275862,
+            "energy_core": 0.3603448275862069,
+            "cycles": 11828581.137931034,
+            "instructions": 10211159.603448275
+        },
+        "802_15_4-data": {
+            "energy_pkg": 2.199375,
+            "energy_core": 1.43875,
+            "cycles": 54360902.1875,
+            "instructions": 58094449.8125
+        },
+        "dhcpv6-ntp-server": {
+            "energy_pkg": 0.7706666666666666,
+            "energy_core": 0.4771111111111111,
+            "cycles": 15955402.155555556,
+            "instructions": 14644580.377777778
+        },
+        "ospf2-seg-fault-1-v": {
+            "energy_pkg": 0.43544303797468353,
+            "energy_core": 0.2645569620253164,
+            "cycles": 8969321.746835442,
+            "instructions": 7403658.924050633
+        },
+        "pppoes": {
+            "energy_pkg": 0.6066071428571428,
+            "energy_core": 0.3751785714285715,
+            "cycles": 14029630.67857143,
+            "instructions": 12691762.19642857
+        },
+        "isis_2-v": {
+            "energy_pkg": 1.094375,
+            "energy_core": 0.6975,
+            "cycles": 26759325.59375,
+            "instructions": 26157101.78125
+        },
+        "q933-heapoverflow-2": {
+            "energy_pkg": 1.8026315789473684,
+            "energy_core": 1.1657894736842105,
+            "cycles": 47587664.368421055,
+            "instructions": 49822200.05263158
+        },
+        "heapoverflow-tcp_print": {
+            "energy_pkg": 1.6528571428571428,
+            "energy_core": 1.0714285714285714,
+            "cycles": 43385622.333333336,
+            "instructions": 46327437.571428575
+        },
+        "udld-inf-loop-1-v": {
+            "energy_pkg": 1.41,
+            "energy_core": 0.9464285714285714,
+            "cycles": 64555061.60714286,
+            "instructions": 64709162.571428575
+        },
+        "lspping-fec-rsvp-vv": {
+            "energy_pkg": 0.3908988764044944,
+            "energy_core": 0.23808988764044944,
+            "cycles": 8969922.876404494,
+            "instructions": 7675662.808988764
+        },
+        "rsvp-inf-loop-2-v": {
+            "energy_pkg": 1.1170967741935485,
+            "energy_core": 0.705483870967742,
+            "cycles": 24584819.548387095,
+            "instructions": 23116423.580645163
+        },
+        "ospf3_bc-vv": {
+            "energy_pkg": 0.419125,
+            "energy_core": 0.25375000000000003,
+            "cycles": 8719165.8625,
+            "instructions": 7228459.35
+        },
+        "icmpv6_opt24-v": {
+            "energy_pkg": 0.6538461538461539,
+            "energy_core": 0.3988461538461538,
+            "cycles": 14615015.73076923,
+            "instructions": 12930859.615384616
+        },
+        "l2tp-avp-overflow": {
+            "energy_pkg": 2.238125,
+            "energy_core": 1.468125,
+            "cycles": 55893832.4375,
+            "instructions": 60730208.1875
+        },
+        "rsvp_infloop-v": {
+            "energy_pkg": 1.0974193548387097,
+            "energy_core": 0.6880645161290322,
+            "cycles": 23185139.580645163,
+            "instructions": 22313222.35483871
+        },
+        "wb-oobr": {
+            "energy_pkg": 2.226875,
+            "energy_core": 1.45625,
+            "cycles": 57413387.625,
+            "instructions": 61199601.625
+        },
+        "esis_snpa_asan": {
+            "energy_pkg": 2.246666666666667,
+            "energy_core": 1.4513333333333334,
+            "cycles": 51812554.53333333,
+            "instructions": 55311901.0
+        },
+        "802_15_4-oobr-2": {
+            "energy_pkg": 2.166875,
+            "energy_core": 1.414375,
+            "cycles": 55206254.875,
+            "instructions": 57533024.8125
+        },
+        "qinq": {
+            "energy_pkg": 0.5380952380952381,
+            "energy_core": 0.32952380952380955,
+            "cycles": 11723167.825396825,
+            "instructions": 10555664.047619049
+        },
+        "radius-v": {
+            "energy_pkg": 1.1806666666666668,
+            "energy_core": 0.756,
+            "cycles": 26451687.5,
+            "instructions": 26937612.166666668
+        },
+        "lldp-infinite-loop-1": {
+            "energy_pkg": 2.126875,
+            "energy_core": 1.375,
+            "cycles": 50860861.5,
+            "instructions": 52078686.3125
+        },
+        "icmp-cksum-oobr-1": {
+            "energy_pkg": 2.0752941176470587,
+            "energy_core": 1.3541176470588234,
+            "cycles": 51308973.0,
+            "instructions": 55596064.058823526
+        },
+        "pgm_opts_asan": {
+            "energy_pkg": 2.316666666666667,
+            "energy_core": 1.5159999999999998,
+            "cycles": 60736500.0,
+            "instructions": 67558707.8
+        },
+        "radius-port1700": {
+            "energy_pkg": 1.1624137931034484,
+            "energy_core": 0.7320689655172414,
+            "cycles": 24319432.379310343,
+            "instructions": 23168361.827586208
+        },
+        "dns-zlip-2": {
+            "energy_pkg": 2.6438461538461535,
+            "energy_core": 1.7215384615384615,
+            "cycles": 64832324.538461536,
+            "instructions": 70641738.84615384
+        },
+        "icmpv6": {
+            "energy_pkg": 0.6418867924528302,
+            "energy_core": 0.3939622641509434,
+            "cycles": 14309817.981132075,
+            "instructions": 12626796.811320756
+        },
+        "ospf3_mp-vv": {
+            "energy_pkg": 0.4248051948051948,
+            "energy_core": 0.25532467532467534,
+            "cycles": 8881572.493506493,
+            "instructions": 7297628.051948052
+        },
+        "babel1": {
+            "energy_pkg": 0.5713333333333334,
+            "energy_core": 0.35350000000000004,
+            "cycles": 12590040.333333334,
+            "instructions": 11614386.7
+        },
+        "juniper_atm1": {
+            "energy_pkg": 2.193125,
+            "energy_core": 1.425,
+            "cycles": 53861628.75,
+            "instructions": 56411266.9375
+        },
+        "esis_snpa_asan-3": {
+            "energy_pkg": 2.255,
+            "energy_core": 1.448125,
+            "cycles": 55746704.5625,
+            "instructions": 58214432.875
+        },
+        "dnssec-vv": {
+            "energy_pkg": 0.9345945945945946,
+            "energy_core": 0.5754054054054054,
+            "cycles": 19870431.08108108,
+            "instructions": 17080031.81081081
+        },
+        "dvmrp": {
+            "energy_pkg": 0.6684905660377358,
+            "energy_core": 0.4160377358490566,
+            "cycles": 17408928.679245282,
+            "instructions": 16660581.094339622
+        },
+        "esp0": {
+            "energy_pkg": 0.29570093457943925,
+            "energy_core": 0.17700934579439254,
+            "cycles": 5687106.158878504,
+            "instructions": 4678206.495327103
+        },
+        "print-X": {
+            "energy_pkg": 0.24229629629629632,
+            "energy_core": 0.14696296296296296,
+            "cycles": 6791376.0,
+            "instructions": 5891606.844444444
+        },
+        "hoobr_lookup_nsap": {
+            "energy_pkg": 2.0423529411764707,
+            "energy_core": 1.333529411764706,
+            "cycles": 56501187.4117647,
+            "instructions": 62687807.11764706
+        },
+        "geneve-v": {
+            "energy_pkg": 1.248888888888889,
+            "energy_core": 0.7937037037037037,
+            "cycles": 28809769.14814815,
+            "instructions": 27781484.14814815
+        },
+        "aarp-heapoverflow-2": {
+            "energy_pkg": 1.7033333333333336,
+            "energy_core": 1.0861904761904762,
+            "cycles": 39265036.85714286,
+            "instructions": 39261496.333333336
+        },
+        "bfd-raw-auth-sha1": {
+            "energy_pkg": 1.5681818181818181,
+            "energy_core": 1.0072727272727273,
+            "cycles": 38435738.59090909,
+            "instructions": 40436714.04545455
+        },
+        "vrrp": {
+            "energy_pkg": 0.9905714285714287,
+            "energy_core": 0.6154285714285714,
+            "cycles": 20609509.828571428,
+            "instructions": 19023908.85714286
+        },
+        "hoobr_juniper": {
+            "energy_pkg": 1.9694444444444446,
+            "energy_core": 1.2838888888888889,
+            "cycles": 49405662.0,
+            "instructions": 52363254.666666664
+        },
+        "cfm_sender_id-oobr": {
+            "energy_pkg": 2.6492857142857145,
+            "energy_core": 1.749285714285714,
+            "cycles": 67704302.57142857,
+            "instructions": 75950329.28571428
+        },
+        "pgm_opts_asan_3": {
+            "energy_pkg": 2.2886666666666664,
+            "energy_core": 1.4933333333333332,
+            "cycles": 55051784.666666664,
+            "instructions": 59120860.333333336
+        },
+        "pim_header_asan-3": {
+            "energy_pkg": 2.447857142857143,
+            "energy_core": 1.5985714285714285,
+            "cycles": 58235791.571428575,
+            "instructions": 62239846.14285714
+        },
+        "resp_4_infiniteloop": {
+            "energy_pkg": 2.1176470588235294,
+            "energy_core": 1.383529411764706,
+            "cycles": 52123095.35294118,
+            "instructions": 55478067.11764706
+        },
+        "msnlb2": {
+            "energy_pkg": 0.8342857142857143,
+            "energy_core": 0.5154761904761904,
+            "cycles": 18875243.73809524,
+            "instructions": 16592443.952380951
+        },
+        "hoobr_juniper3": {
+            "energy_pkg": 1.9811111111111108,
+            "energy_core": 1.2866666666666666,
+            "cycles": 46903191.11111111,
+            "instructions": 49483724.61111111
+        },
+        "bgp_vpn_attrset": {
+            "energy_pkg": 0.2513492063492064,
+            "energy_core": 0.15063492063492065,
+            "cycles": 5861493.103174604,
+            "instructions": 5133139.611111111
+        },
+        "ipv6-next-header-oobr-2": {
+            "energy_pkg": 1.8052631578947367,
+            "energy_core": 1.1621052631578948,
+            "cycles": 41838444.10526316,
+            "instructions": 42804677.631578945
+        },
+        "cdp-v": {
+            "energy_pkg": 1.1855172413793105,
+            "energy_core": 0.7493103448275862,
+            "cycles": 26695003.44827586,
+            "instructions": 25842654.689655174
+        },
+        "lisp_eid_notify": {
+            "energy_pkg": 1.42,
+            "energy_core": 0.9104166666666668,
+            "cycles": 34984041.416666664,
+            "instructions": 34953798.75
+        },
+        "hoobr_parse_field": {
+            "energy_pkg": 2.001666666666667,
+            "energy_core": 1.3072222222222223,
+            "cycles": 48532041.05555555,
+            "instructions": 52260658.777777776
+        },
+        "lisp_eid_register": {
+            "energy_pkg": 1.436,
+            "energy_core": 0.9256,
+            "cycles": 36095155.68,
+            "instructions": 37787582.0
+        },
+        "isakmp-3948-oobr-2": {
+            "energy_pkg": 1.8289473684210527,
+            "energy_core": 1.178421052631579,
+            "cycles": 44032032.10526316,
+            "instructions": 43894858.10526316
+        },
+        "kday7": {
+            "energy_pkg": 1.3584,
+            "energy_core": 0.8692,
+            "cycles": 33915946.28,
+            "instructions": 33305304.48
+        },
+        "mobility_opt_asan_4": {
+            "energy_pkg": 2.3233333333333333,
+            "energy_core": 1.5,
+            "cycles": 54342006.2,
+            "instructions": 54941414.4
+        },
+        "ikev2four": {
+            "energy_pkg": 0.4411842105263158,
+            "energy_core": 0.26684210526315794,
+            "cycles": 9347257.605263159,
+            "instructions": 7686577.25
+        },
+        "syslog-v": {
+            "energy_pkg": 0.9637837837837837,
+            "energy_core": 0.6124324324324324,
+            "cycles": 27206020.54054054,
+            "instructions": 27465244.27027027
+        },
+        "telnet-iac-check-oobr": {
+            "energy_pkg": 2.125625,
+            "energy_core": 1.37875,
+            "cycles": 53378563.0625,
+            "instructions": 70066159.875
+        },
+        "zmtp1-inf-loop-1": {
+            "energy_pkg": 0.8573170731707317,
+            "energy_core": 0.5439024390243903,
+            "cycles": 23587488.268292684,
+            "instructions": 22196172.341463413
+        },
+        "kday6": {
+            "energy_pkg": 1.3896000000000002,
+            "energy_core": 0.8964,
+            "cycles": 36482592.2,
+            "instructions": 38759001.4
+        },
+        "lldp_mud-vv": {
+            "energy_pkg": 1.196896551724138,
+            "energy_core": 0.7496551724137931,
+            "cycles": 25332611.103448275,
+            "instructions": 23103743.96551724
+        },
+        "ospf3_nbma-vv": {
+            "energy_pkg": 0.4355405405405405,
+            "energy_core": 0.2628378378378378,
+            "cycles": 8856976.256756756,
+            "instructions": 7533371.256756756
+        },
+        "nsh-over-vxlan-gpe": {
+            "energy_pkg": 1.4991666666666665,
+            "energy_core": 0.9708333333333333,
+            "cycles": 36403511.291666664,
+            "instructions": 38745679.75
+        },
+        "esis_opt_prot-oobr": {
+            "energy_pkg": 2.5085714285714285,
+            "energy_core": 1.627857142857143,
+            "cycles": 58149326.071428575,
+            "instructions": 61881047.35714286
+        },
+        "dhcpv6-domain-list": {
+            "energy_pkg": 0.7875,
+            "energy_core": 0.49,
+            "cycles": 17529098.40909091,
+            "instructions": 17105344.181818184
+        },
+        "hoobr_juniper4": {
+            "energy_pkg": 1.9977777777777779,
+            "energy_core": 1.3077777777777777,
+            "cycles": 47959647.94444445,
+            "instructions": 53790385.666666664
+        },
+        "ipv6hdr-heapoverflow-v": {
+            "energy_pkg": 1.741,
+            "energy_core": 1.116,
+            "cycles": 39389603.85,
+            "instructions": 38715503.95
+        },
+        "lspping-fec-rsvp": {
+            "energy_pkg": 0.3964556962025316,
+            "energy_core": 0.24696202531645572,
+            "cycles": 10947540.443037976,
+            "instructions": 8061647.025316455
+        },
+        "igmpv3-queries": {
+            "energy_pkg": 0.6288679245283019,
+            "energy_core": 0.3866037735849056,
+            "cycles": 13858109.0,
+            "instructions": 11805146.339622641
+        },
+        "pim_header_asan-4": {
+            "energy_pkg": 2.5485714285714285,
+            "energy_core": 1.6921428571428572,
+            "cycles": 71187851.14285715,
+            "instructions": 80779214.57142857
+        },
+        "cve-2014-8769-AODV": {
+            "energy_pkg": 1.3107692307692307,
+            "energy_core": 0.8353846153846154,
+            "cycles": 29164849.692307692,
+            "instructions": 28254648.230769232
+        },
+        "evb": {
+            "energy_pkg": 0.694375,
+            "energy_core": 0.4270833333333333,
+            "cycles": 13832901.520833334,
+            "instructions": 12367303.916666666
+        },
+        "heapoverflow-ip_print_demux": {
+            "energy_pkg": 1.598181818181818,
+            "energy_core": 1.0304545454545455,
+            "cycles": 38673819.27272727,
+            "instructions": 39992617.63636363
+        },
+        "rstp-v": {
+            "energy_pkg": 0.7051063829787234,
+            "energy_core": 0.4327659574468085,
+            "cycles": 15178252.021276595,
+            "instructions": 13346595.872340426
+        },
+        "forces01vvv": {
+            "energy_pkg": 0.5098484848484848,
+            "energy_core": 0.3104545454545454,
+            "cycles": 10727885.818181818,
+            "instructions": 9180679.348484848
+        },
+        "lldp_mud-v": {
+            "energy_pkg": 1.206206896551724,
+            "energy_core": 0.7651724137931035,
+            "cycles": 27607731.896551725,
+            "instructions": 26857719.172413792
+        },
+        "gre-heapoverflow-2": {
+            "energy_pkg": 1.616818181818182,
+            "energy_core": 1.035909090909091,
+            "cycles": 39535850.27272727,
+            "instructions": 41020090.90909091
+        },
+        "oobr_parse_elements": {
+            "energy_pkg": 1.913333333333333,
+            "energy_core": 1.235,
+            "cycles": 46891618.44444445,
+            "instructions": 49873364.0
+        },
+        "geneve-vni": {
+            "energy_pkg": 1.249259259259259,
+            "energy_core": 0.7899999999999999,
+            "cycles": 27785733.888888888,
+            "instructions": 26446078.85185185
+        },
+        "ipv6-next-header-oobr-1": {
+            "energy_pkg": 1.7742105263157895,
+            "energy_core": 1.1321052631578947,
+            "cycles": 40078601.10526316,
+            "instructions": 39510337.84210526
+        },
+        "bootp_asan": {
+            "energy_pkg": 2.4585714285714286,
+            "energy_core": 1.6114285714285714,
+            "cycles": 61881914.35714286,
+            "instructions": 67866411.57142857
+        },
+        "dccp_partial_csum_v4_simple": {
+            "energy_pkg": 1.006857142857143,
+            "energy_core": 0.642,
+            "cycles": 28430054.0,
+            "instructions": 29480814.057142857
+        },
+        "of10_s4810-vvvv": {
+            "energy_pkg": 0.9002631578947369,
+            "energy_core": 0.5631578947368421,
+            "cycles": 19835365.44736842,
+            "instructions": 20057602.657894738
+        },
+        "pimv2_sm-v": {
+            "energy_pkg": 1.103030303030303,
+            "energy_core": 0.713030303030303,
+            "cycles": 31664383.515151516,
+            "instructions": 31638643.21212121
+        },
+        "pppoes_id": {
+            "energy_pkg": 0.6041071428571428,
+            "energy_core": 0.36946428571428575,
+            "cycles": 13739367.482142856,
+            "instructions": 13399521.375
+        },
+        "atm-oam-heapoverflow": {
+            "energy_pkg": 1.6414285714285715,
+            "energy_core": 1.0452380952380953,
+            "cycles": 36898073.14285714,
+            "instructions": 37192752.47619048
+        },
+        "pimv2-oobr-2": {
+            "energy_pkg": 2.2125,
+            "energy_core": 1.44125,
+            "cycles": 58317720.9375,
+            "instructions": 72906577.9375
+        },
+        "hsrp_2-v": {
+            "energy_pkg": 1.0438235294117648,
+            "energy_core": 0.6629411764705883,
+            "cycles": 27154983.23529412,
+            "instructions": 30715801.970588237
+        },
+        "mpls-traceroute": {
+            "energy_pkg": 0.4186904761904762,
+            "energy_core": 0.26392857142857146,
+            "cycles": 13672198.297619049,
+            "instructions": 19397042.273809522
+        },
+        "isis-extd-isreach-oobr": {
+            "energy_pkg": 2.6876923076923074,
+            "energy_core": 1.7746153846153847,
+            "cycles": 83625861.38461539,
+            "instructions": 95333212.3076923
+        },
+        "802_15_4_beacon": {
+            "energy_pkg": 2.228125,
+            "energy_core": 1.451875,
+            "cycles": 55790129.0625,
+            "instructions": 61398820.1875
+        },
+        "hoobr_nfs_xid_map_enter": {
+            "energy_pkg": 2.0423529411764707,
+            "energy_core": 1.3405882352941176,
+            "cycles": 55223629.76470588,
+            "instructions": 60227927.176470585
+        },
+        "heapoverflow-atalk_print": {
+            "energy_pkg": 1.585,
+            "energy_core": 1.0254545454545454,
+            "cycles": 38929935.45454545,
+            "instructions": 42190310.04545455
+        },
+        "mpls-traceroute-v": {
+            "energy_pkg": 0.39457831325301207,
+            "energy_core": 0.23939759036144578,
+            "cycles": 8499703.867469879,
+            "instructions": 7156137.144578313
+        },
+        "icmp6_mobileprefix_asan": {
+            "energy_pkg": 2.3386666666666667,
+            "energy_core": 1.518,
+            "cycles": 59326548.666666664,
+            "instructions": 63048139.4
+        },
+        "pimv2_dm-v": {
+            "energy_pkg": 1.0,
+            "energy_core": 0.6248484848484849,
+            "cycles": 19377024.727272727,
+            "instructions": 17755559.818181816
+        },
+        "ripv1v2": {
+            "energy_pkg": 0.7264444444444444,
+            "energy_core": 0.4462222222222222,
+            "cycles": 15348415.177777778,
+            "instructions": 13896841.4
+        },
+        "eap_extract_read2_asan": {
+            "energy_pkg": 2.255625,
+            "energy_core": 1.47,
+            "cycles": 55842705.6875,
+            "instructions": 60681380.1875
+        },
+        "of10_7050q-v": {
+            "energy_pkg": 0.8947368421052632,
+            "energy_core": 0.5578947368421052,
+            "cycles": 19474025.684210528,
+            "instructions": 18529588.97368421
+        },
+        "print-XX": {
+            "energy_pkg": 0.23526315789473684,
+            "energy_core": 0.1381954887218045,
+            "cycles": 4790205.639097745,
+            "instructions": 3908077.3157894737
+        },
+        "qinqv": {
+            "energy_pkg": 0.5516666666666666,
+            "energy_core": 0.33616666666666667,
+            "cycles": 11242947.783333333,
+            "instructions": 9940684.716666667
+        },
+        "sflow2": {
+            "energy_pkg": 0.5485245901639344,
+            "energy_core": 0.33557377049180326,
+            "cycles": 11725362.49180328,
+            "instructions": 10171326.409836065
+        },
+        "nsh": {
+            "energy_pkg": 1.4120833333333334,
+            "energy_core": 0.8945833333333333,
+            "cycles": 29908192.666666668,
+            "instructions": 28650275.375
+        },
+        "rtp-seg-fault-1": {
+            "energy_pkg": 2.7476923076923074,
+            "energy_core": 1.823076923076923,
+            "cycles": 69992981.23076923,
+            "instructions": 82336574.92307693
+        },
+        "eigrp4-v": {
+            "energy_pkg": 1.2317857142857143,
+            "energy_core": 0.78,
+            "cycles": 26932442.57142857,
+            "instructions": 25391165.714285713
+        },
+        "isakmp2": {
+            "energy_pkg": 0.3107619047619048,
+            "energy_core": 0.1880952380952381,
+            "cycles": 6692973.219047619,
+            "instructions": 5617234.428571428
+        },
+        "pimv2_bootstrap-v": {
+            "energy_pkg": 1.0333333333333334,
+            "energy_core": 0.6509090909090909,
+            "cycles": 24157232.575757574,
+            "instructions": 22627760.151515152
+        },
+        "radius-rfc5176": {
+            "energy_pkg": 1.2227586206896552,
+            "energy_core": 0.7872413793103448,
+            "cycles": 33184705.586206898,
+            "instructions": 33448610.48275862
+        },
+        "heapoverflow-in_checksum": {
+            "energy_pkg": 1.7152380952380955,
+            "energy_core": 1.1314285714285715,
+            "cycles": 51708916.61904762,
+            "instructions": 53828800.61904762
+        },
+        "kday4": {
+            "energy_pkg": 1.3772,
+            "energy_core": 0.8884000000000001,
+            "cycles": 33555831.48,
+            "instructions": 35189261.0
+        },
+        "bfd-raw-auth-md5-v": {
+            "energy_pkg": 1.5243478260869565,
+            "energy_core": 0.9765217391304348,
+            "cycles": 36501585.652173914,
+            "instructions": 36726687.04347826
+        },
+        "bgp_vpn_rt-oobr": {
+            "energy_pkg": 2.6185714285714283,
+            "energy_core": 1.717142857142857,
+            "cycles": 82852345.07142857,
+            "instructions": 97522957.35714285
+        },
+        "mpls-ldp-hello": {
+            "energy_pkg": 0.33285714285714285,
+            "energy_core": 0.20010204081632652,
+            "cycles": 6771571.602040816,
+            "instructions": 5757419.632653061
+        },
+        "vqp-oobr": {
+            "energy_pkg": 2.547857142857143,
+            "energy_core": 1.67,
+            "cycles": 67267221.92857143,
+            "instructions": 73944238.42857143
+        },
+        "rsvp_uni-oobr-3": {
+            "energy_pkg": 2.5664285714285713,
+            "energy_core": 1.6714285714285713,
+            "cycles": 63503674.78571428,
+            "instructions": 67566392.92857143
+        },
+        "igmpv1": {
+            "energy_pkg": 0.6105454545454545,
+            "energy_core": 0.37381818181818177,
+            "cycles": 12377986.290909091,
+            "instructions": 11046260.6
+        },
+        "isis-seg-fault-3-v": {
+            "energy_pkg": 1.0874193548387097,
+            "energy_core": 0.6848387096774193,
+            "cycles": 24141023.967741936,
+            "instructions": 22730473.64516129
+        },
+        "dhcpv6-ia-pd": {
+            "energy_pkg": 0.7537777777777778,
+            "energy_core": 0.4651111111111111,
+            "cycles": 16857960.955555554,
+            "instructions": 15787938.51111111
+        },
+        "isis_infloop-v": {
+            "energy_pkg": 1.0334375,
+            "energy_core": 0.644375,
+            "cycles": 22227149.03125,
+            "instructions": 19863514.96875
+        },
+        "ripv2_auth": {
+            "energy_pkg": 0.7360869565217392,
+            "energy_core": 0.4543478260869565,
+            "cycles": 16437325.869565217,
+            "instructions": 14070943.282608695
+        },
+        "dao01": {
+            "energy_pkg": 0.6361764705882352,
+            "energy_core": 0.42794117647058827,
+            "cycles": 31575246.32352941,
+            "instructions": 27532582.088235293
+        },
+        "hdlc2": {
+            "energy_pkg": 1.4421428571428572,
+            "energy_core": 0.9703571428571429,
+            "cycles": 70854894.0,
+            "instructions": 68336272.82142857
+        },
+        "mtrace": {
+            "energy_pkg": 0.711923076923077,
+            "energy_core": 0.45769230769230773,
+            "cycles": 24259116.865384616,
+            "instructions": 41245177.75
+        },
+        "ospf3_ah-vv": {
+            "energy_pkg": 0.432125,
+            "energy_core": 0.26725,
+            "cycles": 11555281.925,
+            "instructions": 9580433.075
+        },
+        "isakmp1": {
+            "energy_pkg": 0.3191428571428571,
+            "energy_core": 0.19647619047619047,
+            "cycles": 8484440.847619047,
+            "instructions": 6984427.209523809
+        }
+    }
+}

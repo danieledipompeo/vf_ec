@@ -1,0 +1,18 @@
+{
+    "f1f4fbde2ad48bd6cd61c2d054c4efcd9dcc73e6": {
+        "heartbeat_test": {
+            "energy_pkg": 0.02494884910485934,
+            "energy_core": 0.01699488491048593,
+            "cycles": 1348387.9309462917,
+            "instructions": 2269942.223785166
+        }
+    },
+    "1632ef744872edc2aa2a53d487d3e79c965a4ad3": {
+        "heartbeat_test": {
+            "energy_pkg": 0.02774078478002378,
+            "energy_core": 0.019262782401902497,
+            "cycles": 1736054.8430439953,
+            "instructions": 2875833.0083234245
+        }
+    }
+}

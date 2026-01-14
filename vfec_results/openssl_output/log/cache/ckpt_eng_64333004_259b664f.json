@@ -1,0 +1,30 @@
+{
+    "64333004a41a9f4aa587b8e5401420fb70d00687": {
+        "srptest": {
+            "energy_pkg": 0.4817721518987342,
+            "energy_core": 0.3740506329113924,
+            "cycles": 97152203.2278481,
+            "instructions": 116820783.51898734
+        },
+        "clienthellotest": {
+            "energy_pkg": 0.030072463768115943,
+            "energy_core": 0.020507246376811596,
+            "cycles": 1645318.2115942028,
+            "instructions": 2851637.1579710143
+        }
+    },
+    "259b664f950c2ba66fbf4b0fe5281327904ead21": {
+        "srptest": {
+            "energy_pkg": 0.5103703703703704,
+            "energy_core": 0.3959259259259259,
+            "cycles": 97690827.61728396,
+            "instructions": 115918743.91358025
+        },
+        "clienthellotest": {
+            "energy_pkg": 0.03038123167155425,
+            "energy_core": 0.02086510263929619,
+            "cycles": 1544030.0923753665,
+            "instructions": 2562441.3607038124
+        }
+    }
+}
