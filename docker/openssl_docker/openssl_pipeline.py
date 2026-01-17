@@ -7,6 +7,30 @@ import time
 import math
 import sys
 import urllib.request
+import pandas as pd
+import re
+
+
+class ProgressBar:
+    def __init__(self, total, length=40, step=1):
+        self.total = total
+        self.length = length
+        self.step = step
+
+    def update(self, i):
+        progress = (i + 1) / self.total
+        filled = int(self.length * progress)
+        bar = '█' * filled + '░' * (self.length - filled)
+        print(f"\r[{bar}] {i+1}/{self.total}", end='', flush=True)
+
+    def log(self, msg):
+        print()
+        print(msg)
+        self.update(self.current)
+
+    def set(self, i):
+        self.current = i
+        self.update(i)
 
 # ==========================================
 # CONFIGURATION
@@ -28,19 +52,19 @@ INPUT_CSV = os.path.join(INPUT_DIR, "cwe_projects.csv")
 PROJECT_DIR = os.path.join(INPUT_DIR, REPO_NAME)
 LOG_DIR = os.path.join(OUTPUT_DIR, "log")
 CACHE_DIR = os.path.join(LOG_DIR, "cache")
+GCDA_DIR = os.path.join(OUTPUT_DIR, "gcda_files")
 
 ITERATIONS = 5
 
 COOL_DOWN_TO_SEC = 1.0
 
-for d in [INPUT_DIR, OUTPUT_DIR, LOG_DIR, CACHE_DIR]:
+ENERGY_RE = re.compile(r'\bpower/energy-[^/\s]+/?\b')
+
+for d in [INPUT_DIR, OUTPUT_DIR, LOG_DIR, CACHE_DIR, GCDA_DIR]:
     if not os.path.exists(d): os.makedirs(d)
 
 LOG_FILE = os.path.join(LOG_DIR, "pipeline_execution.log")
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-console = logging.StreamHandler()
-console.setLevel(logging.INFO)
-logging.getLogger('').addHandler(console)
 
 # ==========================================
 # HELPERS
@@ -95,6 +119,12 @@ def get_git_diff_files(cwd, commit_hash):
     return {f for f in result.stdout.strip().split('\n') if f}
 
 def get_covered_files(cwd):
+    """
+    Scans the given directory for .gcda files and maps them to their corresponding .c source files.
+    Returns a list of source file paths relative to the cwd.
+
+    :param cwd: Description
+    """
     covered = set()
     for root, dirs, files in os.walk(cwd):
         for file in files:
@@ -202,277 +232,237 @@ def get_openssl_tests(cwd):
 # ==========================================
 # PHASE 1: COVERAGE
 # ==========================================
-def run_phase_1_coverage(vuln, fix, master_csv_path, checkpoint_path):
-    if os.path.exists(master_csv_path):
-        with open(master_csv_path, 'r') as f:
-            if f"{vuln},{fix}" in f.read():
-                logging.info(f"Skipping P1 for {vuln}->{fix} (Found in Master CSV)")
-                return True
 
-    logging.info(f"--- Phase 1: Coverage {vuln} -> {fix} ---")
-    
-    clean_repo(PROJECT_DIR)
-    if not run_command(f"git checkout -f {fix}", PROJECT_DIR): return False
-    target_files = get_git_diff_files(PROJECT_DIR, fix)
-    
-    if not target_files:
-        logging.error("No target files found in git diff.")
-        return False
-
-    cached_data = load_json(checkpoint_path)
-    vuln_results = cached_data.get("results", {})
-
-    # A. VULN COMMIT
-    if cached_data.get("status") != "COMPLETE":
-        logging.info(f"Building Vuln {vuln} (Coverage)...")
+def process_commit(commit, coverage=True): 
+        logging.info(f"Building {commit[:8]} (Coverage)...")
         clean_repo(PROJECT_DIR)
-        run_command(f"git checkout -f {vuln}", PROJECT_DIR)
+        run_command(f"git checkout -f {commit}", PROJECT_DIR)
         
-        if not configure_openssl(PROJECT_DIR, coverage=True): return False
+        if not configure_openssl(PROJECT_DIR, coverage=coverage): return False
         if not build_openssl(PROJECT_DIR): return False
         
         suite = get_openssl_tests(PROJECT_DIR)
-        print(f"Running {len(suite)} tests for Vuln Commit...")
+        print(f"\nRunning {len(suite)} tests...")
 
-        for i, test in enumerate(suite):
-            t_name = test['name']
-            if t_name in vuln_results: continue
-            
-            if i % 20 == 0: print(f"  [P1-Vuln] {i}/{len(suite)}: {t_name}")
-            
+        commit_results = {
+            "hash": commit,
+            "tests": []
+        }
+
+        pb = ProgressBar(len(suite), step=10)
+        for i, t in enumerate(suite):
+            pb.set(i)
+
+            test = {
+                "name": t['name'],
+                "failed": False,
+                "cmd": t['cmd'],
+                "covered_files": []
+            }
+
+            # Clean previous coverage data
             run_command("find . -name '*.gcda' -delete", PROJECT_DIR)
             
             # For Coverage, 'make target' is fine as it usually runs the test too or we assume build covers it.
             # But usually we need to RUN it to get coverage.
             # If legacy, running 'make test_name' might NOT run it.
             # Let's force run if legacy.
-            run_command(test['cmd'], PROJECT_DIR, ignore_errors=True)
-            if test.get("type") == "legacy":
-                 run_command(test.get("run_bin"), PROJECT_DIR, ignore_errors=True)
+
+            if not run_command(test.get('cmd'), PROJECT_DIR):
+                if test.get("type") == "legacy":
+                    logging.info(f"[Legacy] Running binary for test: {test.get('name')}")
+                    if not run_command(test.get('run_bin'), PROJECT_DIR, ignore_errors=True):
+                        logging.warning(f"Test Build/Run Failed: {test.get('name')}")
+                        test['failed'] = True
+                        commit_results['tests'].append(test)
+                        continue
+                logging.warning(f"Test Build/Run Failed: {test.get('name')}")
+                test['failed'] = True
+                commit_results['tests'].append(test)
+                continue
             
             covered = get_covered_files(PROJECT_DIR)
-            relevant = [f for f in covered if f in target_files]
+            test['covered_files'] = covered
+            commit_results['tests'].append(test)
             
-            if relevant:
-                vuln_results[t_name] = relevant
-                save_json(checkpoint_path, {"status": "IN_PROGRESS", "results": vuln_results})
-        
-        save_json(checkpoint_path, {"status": "COMPLETE", "results": vuln_results})
+        return commit_results
 
-    # B. FIX COMMIT
-    logging.info(f"Building Fix {fix} (Coverage)...")
+def prepare_for_energy_measurement():
+    """
+    Prepare the project for energy measurement.
+    Build the project without coverage.
+    
+    :param rapl_pkg: Description
+    :param test: Description
+    :param commit: Description
+    """
+    print("\nPreparing project for energy measurement...")
+
+    configure_openssl(PROJECT_DIR, coverage=False)
+    build_openssl(PROJECT_DIR)
+    
+def run_phase_1_coverage(vuln, fix):
+    """
+    Run Phase 1 coverage analysis on a vulnerability and its fix commits.
+    This function analyzes test coverage for changed files between a vulnerability
+    commit and its corresponding fix commit. It processes both commits by running
+    tests, extracting relevant test coverage, and measuring energy consumption
+    using RAPL (Running Average Power Limit) for each successful test.
+    Args:
+        vuln (str): The git commit hash of the vulnerability commit.
+        fix (str): The git commit hash of the fix commit.
+    Returns:
+        dict or None: A dictionary containing coverage analysis results with the structure:
+            {
+                "project": str,
+                    "hash": str,
+                    "failed": {"status": bool, "reason": str},
+                    "tests": list
+                    "hash": str,
+                    "failed": {"status": bool, "reason": str},
+                    "tests": list
+        Returns None if:
+        - Checking out the fix commit fails
+        - No changed files are found in git diff
+        - No successful tests exist in either commit
+    """
+    logging.info(f"--- Phase 1: Coverage {vuln[:8]} -> {fix[:8]} ---")
+    coverage_results = {
+        "project": REPO_NAME,
+        "vuln_commit": {
+            "hash": vuln,
+            "failed":{
+                "status": False,
+                "reason": ""
+            },
+            "tests": []
+        },
+        "fix_commit": {
+            "hash": fix,
+            "failed": {
+                "status": False,
+                "reason": ""
+            },
+            "tests": []
+        }
+    }
+    
     clean_repo(PROJECT_DIR)
-    run_command(f"git checkout -f {fix}", PROJECT_DIR)
+    if not run_command(f"git checkout -f {fix}", PROJECT_DIR):
+        logging.error(f"Failed to checkout fix commit: {fix}")
+        return None
     
-    if not configure_openssl(PROJECT_DIR, coverage=True): return False
-    if not build_openssl(PROJECT_DIR): return False
-
-    suite = get_openssl_tests(PROJECT_DIR)
-    csv_buffer = []
-    csv_header = ["project", "vuln_commit", "v_testname", "fix_commit", "f_testname", "sourcefile"]
+    git_changed_files= get_git_diff_files(PROJECT_DIR, fix)
     
-    print(f"Running {len(suite)} tests for Fix Commit...")
-    for i, test in enumerate(suite):
-        t_name = test['name']
-        if i % 20 == 0: print(f"  [P1-Fix] {i}/{len(suite)}: {t_name}")
+    if not git_changed_files:
+        logging.error("No target files found in git diff.")
+        return None
+    
+    # FIX COMMIT
+    coverage_results['fix_commit'] = process_commit(fix)
+    if not coverage_results['fix_commit'].get('tests') or all(t.get('failed', True) for t in coverage_results['fix_commit']['tests']):
+        logging.error("No successful tests in fix commit. Skipping vuln commit.")
+        return None
+    
+    if coverage_results.get('failed', {}).get('status', False): 
+        extract_test_covering_git_changes(coverage_results['fix_commit'].get('tests', []), git_changed_files)
+    logging.info(f"Extracted tests covering changed files in pair ({vuln[:8]}, {fix[:8]}).")
+    
+    logging.info(f"Now computing energy for {fix[:8]}.")
+    
+    # extract RAPL package events
+    rapl_pkg = detect_rapl()
 
-        run_command("find . -name '*.gcda' -delete", PROJECT_DIR)
-        run_command(test['cmd'], PROJECT_DIR, ignore_errors=True)
-        if test.get("type") == "legacy":
-             run_command(test.get("run_bin"), PROJECT_DIR, ignore_errors=True)
+    kept_tests = [t for t in coverage_results['fix_commit'].get('tests', []) if t.get('keep', True) and not t.get('failed', True)]
+
+    prepare_for_energy_measurement()
+    for test in kept_tests:
+        measure_test(rapl_pkg, test, fix)
+
+    # VULN COMMIT
+    coverage_results['vuln_commit'] = process_commit(vuln)
+    if not coverage_results['vuln_commit'].get('tests') or all(t.get('failed', True) for t in coverage_results['vuln_commit']['tests']):
+        logging.error("No successful tests in vuln commit. Skipping processing.")
+        return None
+
+    logging.info(f"{vuln[:8]} completed.")
+
+    if coverage_results.get('failed', {}).get('status', False): 
+        extract_test_covering_git_changes(coverage_results['vuln_commit'].get('tests', []), git_changed_files)
+    logging.info(f"Extracted tests covering changed files in pair ({vuln[:8]}, {fix[:8]}).")
+    logging.info(f"Now computing energy for {vuln[:8]}.")
+    
+    kept_tests = [t for t in coverage_results['vuln_commit'].get('tests', []) if t.get('keep', True) and not t.get('failed', True)]
+    
+    prepare_for_energy_measurement()
+    for test in kept_tests:
+        measure_test(rapl_pkg, test, vuln)
+    
+def extract_test_covering_git_changes(coverage_results, target_files):  
+    """
+    Mark "keep" in tests that cover changed files. 
+    
+    :param coverage_results: Description
+    :param target_files: Description
+    """
+
+    for target in target_files:
+        for test in coverage_results.get('tests', []):
+            if coverage_results.get('failed', {}).get('status', True):
+                continue
         
-        covered = get_covered_files(PROJECT_DIR)
-        
-        for target in target_files:
-            v_covered = (t_name in vuln_results) and (target in vuln_results[t_name])
-            f_covered = target in covered
+            for test in coverage_results.get('tests', []):
+                covered_files = test.get('covered_files', [])
+                test['keep'] = target in covered_files
 
-            if v_covered or f_covered:
-                v_entry = t_name if v_covered else ""
-                f_entry = t_name if f_covered else ""
-                csv_buffer.append([REPO_NAME, vuln, v_entry, fix, f_entry, target])
-
-        if len(csv_buffer) >= CSV_WRITE_INTERVAL:
-            flush_buffer_to_csv(master_csv_path, csv_buffer, csv_header)
-
-    flush_buffer_to_csv(master_csv_path, csv_buffer, csv_header)
-    return True
 
 # ==========================================
 # PHASE 2: ENERGY
 # ==========================================
-def detect_rapl():
-    res = subprocess.run("perf list", shell=True, stdout=subprocess.PIPE, text=True)
-    out = res.stdout
-    pkg = "power/energy-pkg/" if "power/energy-pkg/" in out else "power/energy-pkg"
-    #core = "power/energy-cores/" if "power/energy-cores/" in out else "power/energy-cores"
-    return pkg#, core
+def detect_rapl(perf_bin="perf"):
+    # --no-desc makes output easier to parse if supported; if not, fall back.
+    cmd = [perf_bin, "list", "--no-desc"]
+    try:
+        out = subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError:
+        out = subprocess.check_output([perf_bin, "list"], text=True, stderr=subprocess.STDOUT)
 
-def measure_test(exec_cmd, pkg_event, test_name, commit):#, core_event):
-    start = time.time()
-    # Ensure command works before measuring
-    if not run_command(exec_cmd, PROJECT_DIR, ignore_errors=True): 
-        print(f"Test Execution Failed: {exec_cmd}")
-        logging.warning(f"Test Execution Failed: {exec_cmd}")
-        return None
-        
-    duration = max(time.time() - start, 0.001)
-    iterations = math.ceil(TARGET_DURATION_SEC / duration)
-    print(f"\tWaheed Iterations for {test_name}: {iterations} (Duration: {duration:.4f}s)")
+    events = set()
+    for line in out.splitlines():
+        # Grab all matches from the line (some lines may include multiple tokens)
+        for m in ENERGY_RE.findall(line):
+            # Normalize to the canonical perf selector form with trailing '/'
+            if not m.endswith("/"):
+                m += "/"
+            events.add(m)
+
+    return sorted(events)
+
+def measure_test(pkg_event, test, commit):#, core_event):
     
-    loop_cmd = f"for i in $(seq 1 {iterations}); do {exec_cmd} >/dev/null 2>&1; done"
-    #perf_cmd = f"perf stat -a -e {pkg_event},{core_event},cycles,instructions -x, sh -c '{loop_cmd}'"
-    #perf_cmd = f"perf stat -a -e {pkg_event},cycles,instructions -x, sh -c '{exec_cmd}'"
-    
+    pb = ProgressBar(ITERATIONS)
+    perf_dir = os.path.join(OUTPUT_DIR, REPO_NAME, "perf")
+    os.makedirs(perf_dir, exist_ok=True)
+    print(f"Running {ITERATIONS} iterations for energy measurement...")
     for iteration in range(ITERATIONS):
-        os.makedirs(os.path.join(OUTPUT_DIR, REPO_NAME), exist_ok=True)
-        perf_out = os.path.join(OUTPUT_DIR, REPO_NAME ,f"{commit}_{test_name}__{iteration}.csv")
-        perf_cmd = f"perf stat -a -e {pkg_event},cycles,instructions -x, --output {perf_out} sh -c '{exec_cmd}'"
-        print(f"[MEASURE] Iteration {iteration+1}/{ITERATIONS} - Command: {perf_cmd}")
-        res = subprocess.run(perf_cmd, cwd=PROJECT_DIR, shell=True, stderr=subprocess.PIPE, text=True)
+        pb.set(iteration)
+
+        perf_out = os.path.join(perf_dir, f"{commit}_{test.get('name')}__{iteration}.csv")
+        
+        perf_cmd = f"perf stat -a -e {pkg_event},cycles,instructions -x, --output {perf_out} sh -c '{test['cmd']}'"
+        res = subprocess.run(perf_cmd, cwd=PROJECT_DIR, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        
         if res.returncode != 0: 
-            print(f"[STD ERR] {test_name}: {res.stderr}")
-            os.remove(perf_out)
-            print(f"Perf Measurement removed due to error.")
+            logging.error(f"[STD ERR] {test.get('name')}: {res.stderr}")
+            if os.path.exists(perf_out):
+                os.remove(perf_out)
+            logging.error(f"Perf Measurement removed due to error.")
             return None
         
-        print(f"[COOL DOWN] {COOL_DOWN_TO_SEC} seconds...")
+        logging.info(f"[COOL DOWN] {COOL_DOWN_TO_SEC} seconds...")
         time.sleep(COOL_DOWN_TO_SEC)
         
-
-    metrics = {"energy_pkg": 0.0, "energy_core": 0.0, "cycles": 0, "instructions": 0}
-    for line in res.stderr.split('\n'):
-        parts = line.split(',')
-        if len(parts) < 3: continue
-        try:
-            val = float(parts[0])
-            evt = parts[2]
-            if "energy-pkg" in evt: metrics["energy_pkg"] = val
-            elif "energy-cores" in evt: metrics["energy_core"] = val
-            elif "cycles" in evt: metrics["cycles"] = val
-            elif "instructions" in evt: metrics["instructions"] = val
-        except ValueError: continue
-
-    if iterations > 0:
-        return {k: v / iterations for k, v in metrics.items()}
     return None
-
-def run_phase_2_energy(master_p1_csv, master_p2_csv, checkpoint_path, current_vuln, current_fix):
-    logging.info(f"--- Phase 2: Energy {current_vuln} -> {current_fix} ---")
-    
-    if os.geteuid() != 0:
-        logging.error("Phase 2 requires root permissions.")
-        return False
-
-    relevant_rows = []
-    if os.path.exists(master_p1_csv):
-        with open(master_p1_csv, 'r') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                if row['vuln_commit'] == current_vuln and row['fix_commit'] == current_fix:
-                    relevant_rows.append(row)
-    
-    if not relevant_rows:
-        return False
-
-    #EVENT_PKG, EVENT_CORE = detect_rapl()
-    EVENT_PKG = detect_rapl()
-    cache = load_json(checkpoint_path)
-
-    tasks = {}
-    for row in relevant_rows:
-        if row['v_testname']: tasks.setdefault(current_vuln, set()).add(row['v_testname'])
-        if row['f_testname']: tasks.setdefault(current_fix, set()).add(row['f_testname'])
-
-    for commit, test_set in tasks.items():
-        if commit not in cache: cache[commit] = {}
-        todos = [t for t in test_set if t not in cache[commit]]
-        if not todos: continue
-        
-        logging.info(f"Building {commit} (Standard)...")
-        clean_repo(PROJECT_DIR)
-        run_command(f"git checkout -f {commit}", PROJECT_DIR)
-        
-        if not configure_openssl(PROJECT_DIR, coverage=False): continue
-        if not build_openssl(PROJECT_DIR): continue
-
-        # We must re-scan to determine if this is legacy or modern commit
-        # to know HOW to execute the test.
-        suite = get_openssl_tests(PROJECT_DIR)
-        # Create a lookup map
-        suite_map = {t['name']: t for t in suite}
-
-        for i, test_name in enumerate(todos):
-            print(f"  [P2-Measure] {commit[:8]} - {test_name} ({i+1}/{len(todos)})")
-            
-            test_info = suite_map.get(test_name)
-            if not test_info:
-                logging.warning(f"Test {test_name} not found in current suite scan.")
-                continue
-
-            # DETERMINE CORRECT EXECUTION COMMAND
-            if test_info.get("type") == "modern":
-                cmd = test_info['cmd'] # make test TESTS=...
-            else:
-                # Legacy: Check if binary exists, if not, try root path
-                bin_path = test_info.get("run_bin", f"test/{test_name}")
-                if not os.path.exists(os.path.join(PROJECT_DIR, bin_path)):
-                    # Try root directory fallback
-                    bin_path = test_name 
-                
-                # IMPORTANT: In Phase 2, we just run the binary. 
-                # But sometimes it's not built yet (if we only ran 'make' main).
-                # So we run 'make test_name' first to ensure it's built, then run binary.
-                run_command(f"make {test_name}", PROJECT_DIR)
-                cmd = f"./{bin_path}" if "/" not in bin_path else bin_path
-
-            metrics = measure_test(cmd, EVENT_PKG, test_name, commit)#, EVENT_CORE)
-            if metrics:
-                cache[commit][test_name] = metrics
-                save_json(checkpoint_path, cache)
-
-    csv_buffer = []
-    #csv_header = [
-    #    "project", "vuln_commit", "v_testname", "v_energy_pkg", "v_energy_core", "v_cycles", "v_ipc",
-    #    "fix_commit", "f_testname", "sourcefile", "f_energy_pkg", "f_energy_core", "f_cycles", "f_ipc"
-    #]
-    csv_header = [
-        "project", "vuln_commit", "v_testname", "v_energy_pkg", "v_cycles", "v_ipc",
-        "fix_commit", "f_testname", "sourcefile", "f_energy_pkg", "f_cycles", "f_ipc"
-    ]
-
-    for row in relevant_rows:
-        #v_pkg, v_core, v_cyc, v_ipc = "0", "0", "0", "0"
-        v_pkg, v_cyc, v_ipc = "0", "0", "0"
-        vc, vt = row['vuln_commit'], row['v_testname']
-        if vt and vc in cache and vt in cache[vc]:
-            m = cache[vc][vt]
-            v_pkg = f"{m['energy_pkg']:.4f}"
-            #v_core = f"{m['energy_core']:.4f}"
-            v_cyc = f"{m['cycles']:.0f}"
-            v_ipc = f"{m['instructions']/m['cycles']:.4f}" if m['cycles'] > 0 else "0"
-
-        #f_pkg, f_core, f_cyc, f_ipc = "0", "0", "0", "0"
-        f_pkg, f_cyc, f_ipc = "0", "0", "0"
-        fc, ft = row['fix_commit'], row['f_testname']
-        if ft and fc in cache and ft in cache[fc]:
-            m = cache[fc][ft]
-            f_pkg = f"{m['energy_pkg']:.4f}"
-            #f_core = f"{m['energy_core']:.4f}"
-            f_cyc = f"{m['cycles']:.0f}"
-            f_ipc = f"{m['instructions']/m['cycles']:.4f}" if m['cycles'] > 0 else "0"
-
-        csv_buffer.append([
-            row['project'], row['vuln_commit'], row['v_testname'], 
-            #v_pkg, v_core, v_cyc, v_ipc,
-            v_pkg, v_cyc, v_ipc,
-            row['fix_commit'], row['f_testname'], row['sourcefile'],
-            #f_pkg, f_core, f_cyc, f_ipc
-            f_pkg, f_cyc, f_ipc
-        ])
-
-    flush_buffer_to_csv(master_p2_csv, csv_buffer, csv_header)
-    return True
 
 # ==========================================
 # MAIN
@@ -480,9 +470,6 @@ def run_phase_2_energy(master_p1_csv, master_p2_csv, checkpoint_path, current_vu
 def main():
     download_csv_if_missing()
 
-    MASTER_P1_CSV = os.path.join(OUTPUT_DIR, f"{REPO_NAME}_MASTER_testCompile.csv")
-    MASTER_P2_CSV = os.path.join(OUTPUT_DIR, f"{REPO_NAME}_MASTER_energyperf.csv")
-    
     pairs = []
     try:
         with open(INPUT_CSV, 'r') as f:
@@ -496,15 +483,14 @@ def main():
     for i, (vuln, fix) in enumerate(pairs):
         print(f"\n[{i+1}/{len(pairs)}] Processing Pair: {vuln[:8]} -> {fix[:8]}")
         
-        p1_cache = os.path.join(CACHE_DIR, f"ckpt_cov_{vuln[:8]}.json")
-        p2_cache = os.path.join(CACHE_DIR, f"ckpt_eng_{vuln[:8]}_{fix[:8]}.json")
+        coverage_dict = run_phase_1_coverage(vuln, fix)
+        if coverage_dict is None:
+            print(f"\nSkipping Phase 2 due to Phase 1 failure for pair {vuln[:8]} -> {fix[:8]}")
+            continue
 
-        success_p1 = run_phase_1_coverage(vuln, fix, MASTER_P1_CSV, p1_cache)
-        if success_p1:
-            if not run_phase_2_energy(MASTER_P1_CSV, MASTER_P2_CSV, p2_cache, vuln, fix):
-                print(f"No tests cover this vulnerability-fix pair ({vuln} -> {fix}).")
-        else:
-            print("Skipping Phase 2 due to P1 failure.")
+        coverage_path = os.path.join(OUTPUT_DIR, f"{REPO_NAME}_{vuln[:8]}_{fix[:8]}_coverage.json")
+        with open(coverage_path, "w") as f:
+                json.dump(coverage_dict, f, indent=2)
 
 if __name__ == "__main__":
     main()

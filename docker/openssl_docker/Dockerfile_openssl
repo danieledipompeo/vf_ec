@@ -1,6 +1,7 @@
-FROM mwk-energy-base:1.0
+FROM ubuntu:24.04
 
 RUN apt-get update && apt-get install -y \
+    build-essential rsync wget curl \
     python3 python3-dev libdw-dev libunwind-dev \
     flex bison git pkg-config libelf-dev libtraceevent-dev \
     && rm -rf /var/lib/apt/lists/* \
@@ -10,34 +11,9 @@ RUN apt-get update && apt-get install -y \
     && cp perf /usr/bin \
     && cd / && rm -rf linux
 
-#ENV DEBIAN_FRONTEND=noninteractive
-#
-## 1. Install Dependencies (Optimized for OpenSSL)
-#RUN apt-get update && apt-get install -y \
-#    build-essential \
-#    pkg-config \
-#    git \
-#    python3 \
-#    linux-tools-common \
-#    rsync \
-#    wget \
-#    curl \
-#    # perl 
-#    # libslang2 \
-#    # libunwind8 \
-#    # liblzma5 \
-#    # libnuma1 \
-#    # libelf1 \
-#    # libdw1 \
-#    # libzstd1 \
-#    # libdebuginfod1 \
-#    # libpfm4 \
-#    # libpython3.12 \
-#    # libperl5.38 \
-#    # libtraceevent1 \
-#    # libbabeltrace1 \
-#    # && rm -rf /var/lib/apt/lists/*
-#
+COPY requirements.txt /app/
+RUN pip3 install --no-cache-dir --break-system-packages -r /app/requirements.txt
+
 # 2. Setup paths
 WORKDIR /app
 #RUN mkdir -p /app/inputs \
