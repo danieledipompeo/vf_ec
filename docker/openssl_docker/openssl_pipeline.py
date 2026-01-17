@@ -29,6 +29,10 @@ PROJECT_DIR = os.path.join(INPUT_DIR, REPO_NAME)
 LOG_DIR = os.path.join(OUTPUT_DIR, "log")
 CACHE_DIR = os.path.join(LOG_DIR, "cache")
 
+ITERATIONS = 5
+
+COOL_DOWN_TO_SEC = 1.0
+
 for d in [INPUT_DIR, OUTPUT_DIR, LOG_DIR, CACHE_DIR]:
     if not os.path.exists(d): os.makedirs(d)
 
@@ -301,24 +305,40 @@ def detect_rapl():
     res = subprocess.run("perf list", shell=True, stdout=subprocess.PIPE, text=True)
     out = res.stdout
     pkg = "power/energy-pkg/" if "power/energy-pkg/" in out else "power/energy-pkg"
-    core = "power/energy-cores/" if "power/energy-cores/" in out else "power/energy-cores"
-    return pkg, core
+    #core = "power/energy-cores/" if "power/energy-cores/" in out else "power/energy-cores"
+    return pkg#, core
 
-def measure_test(exec_cmd, pkg_event, core_event):
+def measure_test(exec_cmd, pkg_event, test_name, commit):#, core_event):
     start = time.time()
     # Ensure command works before measuring
     if not run_command(exec_cmd, PROJECT_DIR, ignore_errors=True): 
+        print(f"Test Execution Failed: {exec_cmd}")
         logging.warning(f"Test Execution Failed: {exec_cmd}")
         return None
         
     duration = max(time.time() - start, 0.001)
     iterations = math.ceil(TARGET_DURATION_SEC / duration)
+    print(f"\tWaheed Iterations for {test_name}: {iterations} (Duration: {duration:.4f}s)")
     
     loop_cmd = f"for i in $(seq 1 {iterations}); do {exec_cmd} >/dev/null 2>&1; done"
-    perf_cmd = f"perf stat -a -e {pkg_event},{core_event},cycles,instructions -x, sh -c '{loop_cmd}'"
+    #perf_cmd = f"perf stat -a -e {pkg_event},{core_event},cycles,instructions -x, sh -c '{loop_cmd}'"
+    #perf_cmd = f"perf stat -a -e {pkg_event},cycles,instructions -x, sh -c '{exec_cmd}'"
     
-    res = subprocess.run(perf_cmd, cwd=PROJECT_DIR, shell=True, stderr=subprocess.PIPE, text=True)
-    if res.returncode != 0: return None
+    for iteration in range(ITERATIONS):
+        os.makedirs(os.path.join(OUTPUT_DIR, REPO_NAME), exist_ok=True)
+        perf_out = os.path.join(OUTPUT_DIR, REPO_NAME ,f"{commit}_{test_name}__{iteration}.csv")
+        perf_cmd = f"perf stat -a -e {pkg_event},cycles,instructions -x, --output {perf_out} sh -c '{exec_cmd}'"
+        print(f"[MEASURE] Iteration {iteration+1}/{ITERATIONS} - Command: {perf_cmd}")
+        res = subprocess.run(perf_cmd, cwd=PROJECT_DIR, shell=True, stderr=subprocess.PIPE, text=True)
+        if res.returncode != 0: 
+            print(f"[STD ERR] {test_name}: {res.stderr}")
+            os.remove(perf_out)
+            print(f"Perf Measurement removed due to error.")
+            return None
+        
+        print(f"[COOL DOWN] {COOL_DOWN_TO_SEC} seconds...")
+        time.sleep(COOL_DOWN_TO_SEC)
+        
 
     metrics = {"energy_pkg": 0.0, "energy_core": 0.0, "cycles": 0, "instructions": 0}
     for line in res.stderr.split('\n'):
@@ -353,9 +373,10 @@ def run_phase_2_energy(master_p1_csv, master_p2_csv, checkpoint_path, current_vu
                     relevant_rows.append(row)
     
     if not relevant_rows:
-        return True
+        return False
 
-    EVENT_PKG, EVENT_CORE = detect_rapl()
+    #EVENT_PKG, EVENT_CORE = detect_rapl()
+    EVENT_PKG = detect_rapl()
     cache = load_json(checkpoint_path)
 
     tasks = {}
@@ -402,44 +423,52 @@ def run_phase_2_energy(master_p1_csv, master_p2_csv, checkpoint_path, current_vu
                 # IMPORTANT: In Phase 2, we just run the binary. 
                 # But sometimes it's not built yet (if we only ran 'make' main).
                 # So we run 'make test_name' first to ensure it's built, then run binary.
-                run_command(f"make {test_name}", PROJECT_DIR, ignore_errors=True)
+                run_command(f"make {test_name}", PROJECT_DIR)
                 cmd = f"./{bin_path}" if "/" not in bin_path else bin_path
 
-            metrics = measure_test(cmd, EVENT_PKG, EVENT_CORE)
+            metrics = measure_test(cmd, EVENT_PKG, test_name, commit)#, EVENT_CORE)
             if metrics:
                 cache[commit][test_name] = metrics
                 save_json(checkpoint_path, cache)
 
     csv_buffer = []
+    #csv_header = [
+    #    "project", "vuln_commit", "v_testname", "v_energy_pkg", "v_energy_core", "v_cycles", "v_ipc",
+    #    "fix_commit", "f_testname", "sourcefile", "f_energy_pkg", "f_energy_core", "f_cycles", "f_ipc"
+    #]
     csv_header = [
-        "project", "vuln_commit", "v_testname", "v_energy_pkg", "v_energy_core", "v_cycles", "v_ipc",
-        "fix_commit", "f_testname", "sourcefile", "f_energy_pkg", "f_energy_core", "f_cycles", "f_ipc"
+        "project", "vuln_commit", "v_testname", "v_energy_pkg", "v_cycles", "v_ipc",
+        "fix_commit", "f_testname", "sourcefile", "f_energy_pkg", "f_cycles", "f_ipc"
     ]
 
     for row in relevant_rows:
-        v_pkg, v_core, v_cyc, v_ipc = "0", "0", "0", "0"
+        #v_pkg, v_core, v_cyc, v_ipc = "0", "0", "0", "0"
+        v_pkg, v_cyc, v_ipc = "0", "0", "0"
         vc, vt = row['vuln_commit'], row['v_testname']
         if vt and vc in cache and vt in cache[vc]:
             m = cache[vc][vt]
             v_pkg = f"{m['energy_pkg']:.4f}"
-            v_core = f"{m['energy_core']:.4f}"
+            #v_core = f"{m['energy_core']:.4f}"
             v_cyc = f"{m['cycles']:.0f}"
             v_ipc = f"{m['instructions']/m['cycles']:.4f}" if m['cycles'] > 0 else "0"
 
-        f_pkg, f_core, f_cyc, f_ipc = "0", "0", "0", "0"
+        #f_pkg, f_core, f_cyc, f_ipc = "0", "0", "0", "0"
+        f_pkg, f_cyc, f_ipc = "0", "0", "0"
         fc, ft = row['fix_commit'], row['f_testname']
         if ft and fc in cache and ft in cache[fc]:
             m = cache[fc][ft]
             f_pkg = f"{m['energy_pkg']:.4f}"
-            f_core = f"{m['energy_core']:.4f}"
+            #f_core = f"{m['energy_core']:.4f}"
             f_cyc = f"{m['cycles']:.0f}"
             f_ipc = f"{m['instructions']/m['cycles']:.4f}" if m['cycles'] > 0 else "0"
 
         csv_buffer.append([
             row['project'], row['vuln_commit'], row['v_testname'], 
-            v_pkg, v_core, v_cyc, v_ipc,
+            #v_pkg, v_core, v_cyc, v_ipc,
+            v_pkg, v_cyc, v_ipc,
             row['fix_commit'], row['f_testname'], row['sourcefile'],
-            f_pkg, f_core, f_cyc, f_ipc
+            #f_pkg, f_core, f_cyc, f_ipc
+            f_pkg, f_cyc, f_ipc
         ])
 
     flush_buffer_to_csv(master_p2_csv, csv_buffer, csv_header)
@@ -472,7 +501,8 @@ def main():
 
         success_p1 = run_phase_1_coverage(vuln, fix, MASTER_P1_CSV, p1_cache)
         if success_p1:
-            run_phase_2_energy(MASTER_P1_CSV, MASTER_P2_CSV, p2_cache, vuln, fix)
+            if not run_phase_2_energy(MASTER_P1_CSV, MASTER_P2_CSV, p2_cache, vuln, fix):
+                print(f"No tests cover this vulnerability-fix pair ({vuln} -> {fix}).")
         else:
             print("Skipping Phase 2 due to P1 failure.")
 
