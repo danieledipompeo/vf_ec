@@ -4,11 +4,12 @@ import csv
 import logging
 import json
 import time
-import math
 import sys
 import urllib.request
 import pandas as pd
 import re
+import shlex
+import yaml
 
 
 class ProgressBar:
@@ -55,16 +56,19 @@ CACHE_DIR = os.path.join(LOG_DIR, "cache")
 GCDA_DIR = os.path.join(OUTPUT_DIR, "gcda_files")
 
 ITERATIONS = 5
-
+DEFAULT_TIMEOUT_MS = 1000  # 1 second
 COOL_DOWN_TO_SEC = 1.0
 
 ENERGY_RE = re.compile(r'\bpower/energy-[^/\s]+/?\b')
 
-for d in [INPUT_DIR, OUTPUT_DIR, LOG_DIR, CACHE_DIR, GCDA_DIR]:
-    if not os.path.exists(d): os.makedirs(d)
+def prepare_directories():
+    for d in [INPUT_DIR, OUTPUT_DIR, LOG_DIR, CACHE_DIR, GCDA_DIR]:
+        if not os.path.exists(d): os.makedirs(d)
+        
 
-LOG_FILE = os.path.join(LOG_DIR, "pipeline_execution.log")
-logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+def setup_logging():
+    LOG_FILE = os.path.join(LOG_DIR, "pipeline_execution.log")
+    logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # ==========================================
 # HELPERS
@@ -438,21 +442,84 @@ def detect_rapl(perf_bin="perf"):
 
     return sorted(events)
 
+
+def _wrap_until_timeout(test_cmd: str, timeout_ms: int) -> str:
+    """
+    Returns a bash command that runs `test_cmd` repeatedly until timeout expires.
+    - uses monotonic-ish wall clock via SECONDS (bash built-in, second resolution)
+    - avoids killing a running iteration mid-command (it checks deadline BETWEEN iterations)
+    """
+    # Use bash -lc so we can rely on bash features and keep quoting predictable
+    # SECONDS is integer seconds since shell start; good enough for energy runs (>= 2-5s).
+    timeout_s = max(1, int((timeout_ms + 999) / 1000))  # ceil to seconds
+
+    # Important:
+    # - `set -e` makes failures stop the loop and propagate non-zero to perf (you want this)
+    # - you can change to `|| true` if you prefer "keep looping even if one iteration fails"
+    wrapped = (
+        "bash -lc "
+        + shlex.quote(
+            f"""
+            set -e
+            end=$((SECONDS + {timeout_s}))
+            while [ $SECONDS -lt $end ]; do
+              {test_cmd}
+            done
+            """
+        )
+    )
+    return wrapped
+
 def measure_test(pkg_event, test, commit):#, core_event):
+    # Accept a list from detect_rapl() or a single event string.
+    if isinstance(pkg_event, (list, tuple, set)):
+        events = [str(e).strip() for e in pkg_event if str(e).strip()]
+    elif pkg_event:
+        events = [str(pkg_event).strip()]
+    else:
+        events = []
+
+    if not events:
+        events = ["power/energy-pkg/"]
+
+    perf_events = ",".join(events + ["cycles", "instructions"])
     
     pb = ProgressBar(ITERATIONS)
     perf_dir = os.path.join(OUTPUT_DIR, REPO_NAME, "perf")
     os.makedirs(perf_dir, exist_ok=True)
-    print(f"Running {ITERATIONS} iterations for energy measurement...")
+
+    timeout_ms = test.get("timeout_ms", DEFAULT_TIMEOUT_MS)  # e.g. 5s default, tune per test
+    print(f"\nMeasuring energy for test '{test.get('name')}': "
+          f"{ITERATIONS} iterations × {timeout_ms}ms timeout each")
+
     for iteration in range(ITERATIONS):
         pb.set(iteration)
 
         perf_out = os.path.join(perf_dir, f"{commit}_{test.get('name')}__{iteration}.csv")
-        
-        perf_cmd = f"perf stat -a -e {pkg_event},cycles,instructions -x, --output {perf_out} sh -c '{test['cmd']}'"
-        res = subprocess.run(perf_cmd, cwd=PROJECT_DIR, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        wrapped_cmd = _wrap_until_timeout(test["cmd"], timeout_ms)
+
+        # Build perf as argv list (safer than huge shell string)
+        perf_argv = [
+            "perf", "stat",
+            "-a",
+            "-e", f"{perf_events}",
+            "-x,", "--output", perf_out,
+            "--",
+        ]
+        # wrapped_cmd already includes "bash -lc '<script>'" so we run via sh -c? Not needed.
+        # But since wrapped_cmd is a single string, we can still do: ["sh","-c", wrapped_cmd]
+        perf_argv += ["sh", "-c", wrapped_cmd]
+
+        res = subprocess.run(
+            perf_argv, 
+            cwd=PROJECT_DIR, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE, 
+            text=True)
         
         if res.returncode != 0: 
+            print(f"\n[ERROR] Test {test.get('name')} failed during energy measurement. {res.stderr.strip()}")
             logging.error(f"[STD ERR] {test.get('name')}: {res.stderr}")
             if os.path.exists(perf_out):
                 os.remove(perf_out)
@@ -464,11 +531,27 @@ def measure_test(pkg_event, test, commit):#, core_event):
         
     return None
 
+def read_configuration():
+    config_file = os.path.join(BASE_DIR, "config.yaml")
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, 'r') as f:
+                logging.info(f"Configuration loaded from {config_file}")
+                return yaml.safe_load(f)
+        except Exception as e:
+            logging.error(f"Error reading configuration file: {e}")
+    else:
+        logging.info(f"No configuration file found at {config_file}")
+
 # ==========================================
 # MAIN
 # ==========================================
 def main():
+    prepare_directories()
+    setup_logging()
     download_csv_if_missing()
+
+    read_configuration() 
 
     pairs = []
     try:
