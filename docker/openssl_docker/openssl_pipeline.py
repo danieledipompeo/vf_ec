@@ -376,10 +376,6 @@ def run_phase_1_coverage(vuln, fix):
         logging.error("No successful tests in fix commit. Skipping processing.")
         return None
     
-    # if coverage_results.get('fix_commit', {}).get('failed', {}).get('status', True):
-        # logging.error("Fix commit processing failed. Skipping processing.")
-        # return None 
-    
     extract_test_covering_git_changes(coverage_results.get('fix_commit', {}), git_changed_files)
     logging.info(f"Extracted tests covering changed files in pair ({vuln[:8]}, {fix[:8]}).")
     
@@ -401,10 +397,6 @@ def run_phase_1_coverage(vuln, fix):
         return None
 
     logging.info(f"{vuln[:8]} completed.")
-
-    if coverage_results.get('vuln_commit', {}).get('failed', {}).get('status', True):
-        logging.error("Vuln commit processing failed. Skipping processing.")
-        return None
 
     extract_test_covering_git_changes(coverage_results.get('vuln_commit', {}), git_changed_files)
     logging.info(f"Extracted tests covering changed files in pair ({vuln[:8]}, {fix[:8]}).")
