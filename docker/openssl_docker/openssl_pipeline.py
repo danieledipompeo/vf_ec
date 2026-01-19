@@ -237,59 +237,67 @@ def get_openssl_tests(cwd):
 # PHASE 1: COVERAGE
 # ==========================================
 
-def process_commit(commit, coverage=True): 
-        logging.info(f"Building {commit[:8]} (Coverage)...")
-        clean_repo(PROJECT_DIR)
-        run_command(f"git checkout -f {commit}", PROJECT_DIR)
-        
-        if not configure_openssl(PROJECT_DIR, coverage=coverage): return False
-        if not build_openssl(PROJECT_DIR): return False
-        
-        suite = get_openssl_tests(PROJECT_DIR)
-        print(f"\nRunning {len(suite)} tests...")
+def process_commit(commit: str, coverage: bool = True) -> (dict | None):
+    """ 
+    Process a single commit: checkout, build with coverage, run tests, collect coverage data.
 
-        commit_results = {
-            "hash": commit,
-            "tests": []
+    :param commit: The git commit hash to process
+    :param coverage: Whether to build with coverage instrumentation
+    :return: A dictionary with test results and coverage data, or None if build fails
+    """
+    
+    logging.info(f"Building {commit[:8]} (Coverage)...")
+    clean_repo(PROJECT_DIR)
+    run_command(f"git checkout -f {commit}", PROJECT_DIR)
+    
+    commit_results = {
+        "hash": commit,
+        "tests": []
+    }
+
+    if not configure_openssl(PROJECT_DIR, coverage=coverage): return None
+    if not build_openssl(PROJECT_DIR): return None
+    
+    suite = get_openssl_tests(PROJECT_DIR)
+    print(f"\nRunning {len(suite)} tests...")
+
+    pb = ProgressBar(len(suite), step=10)
+    for i, t in enumerate(suite):
+        pb.set(i)
+
+        test = {
+            "name": t['name'],
+            "failed": False,
+            "cmd": t['cmd'],
+            "covered_files": []
         }
 
-        pb = ProgressBar(len(suite), step=10)
-        for i, t in enumerate(suite):
-            pb.set(i)
+        # Clean previous coverage data
+        run_command("find . -name '*.gcda' -delete", PROJECT_DIR)
+        
+        # For Coverage, 'make target' is fine as it usually runs the test too or we assume build covers it.
+        # But usually we need to RUN it to get coverage.
+        # If legacy, running 'make test_name' might NOT run it.
+        # Let's force run if legacy.
 
-            test = {
-                "name": t['name'],
-                "failed": False,
-                "cmd": t['cmd'],
-                "covered_files": []
-            }
-
-            # Clean previous coverage data
-            run_command("find . -name '*.gcda' -delete", PROJECT_DIR)
-            
-            # For Coverage, 'make target' is fine as it usually runs the test too or we assume build covers it.
-            # But usually we need to RUN it to get coverage.
-            # If legacy, running 'make test_name' might NOT run it.
-            # Let's force run if legacy.
-
-            if not run_command(test.get('cmd'), PROJECT_DIR):
-                if test.get("type") == "legacy":
-                    logging.info(f"[Legacy] Running binary for test: {test.get('name')}")
-                    if not run_command(test.get('run_bin'), PROJECT_DIR, ignore_errors=True):
-                        logging.warning(f"Test Build/Run Failed: {test.get('name')}")
-                        test['failed'] = True
-                        commit_results['tests'].append(test)
-                        continue
-                logging.warning(f"Test Build/Run Failed: {test.get('name')}")
-                test['failed'] = True
-                commit_results['tests'].append(test)
-                continue
-            
-            covered = get_covered_files(PROJECT_DIR)
-            test['covered_files'] = covered
+        if not run_command(test.get('cmd'), PROJECT_DIR):
+            if test.get("type") == "legacy":
+                logging.info(f"[Legacy] Running binary for test: {test.get('name')}")
+                if not run_command(test.get('run_bin'), PROJECT_DIR):
+                    logging.warning(f"Test Build/Run Failed: {test.get('name')}")
+                    test['failed'] = True
+                    commit_results['tests'].append(test)
+                    continue
+            logging.warning(f"Test Build/Run Failed: {test.get('name')}")
+            test['failed'] = True
             commit_results['tests'].append(test)
-            
-        return commit_results
+            continue
+        
+        covered = get_covered_files(PROJECT_DIR)
+        test['covered_files'] = covered
+        commit_results['tests'].append(test)
+        
+    return commit_results
 
 def prepare_for_energy_measurement():
     """
@@ -364,12 +372,15 @@ def run_phase_1_coverage(vuln, fix):
     
     # FIX COMMIT
     coverage_results['fix_commit'] = process_commit(fix)
-    if not coverage_results['fix_commit'].get('tests') or all(t.get('failed', True) for t in coverage_results['fix_commit']['tests']):
-        logging.error("No successful tests in fix commit. Skipping vuln commit.")
+    if not coverage_results['fix_commit'] or all(t.get('failed', True) for t in coverage_results['fix_commit'].get('tests', [])):
+        logging.error("No successful tests in fix commit. Skipping processing.")
         return None
     
-    if coverage_results.get('failed', {}).get('status', False): 
-        extract_test_covering_git_changes(coverage_results['fix_commit'].get('tests', []), git_changed_files)
+    # if coverage_results.get('fix_commit', {}).get('failed', {}).get('status', True):
+        # logging.error("Fix commit processing failed. Skipping processing.")
+        # return None 
+    
+    extract_test_covering_git_changes(coverage_results.get('fix_commit', {}), git_changed_files)
     logging.info(f"Extracted tests covering changed files in pair ({vuln[:8]}, {fix[:8]}).")
     
     logging.info(f"Now computing energy for {fix[:8]}.")
@@ -385,22 +396,27 @@ def run_phase_1_coverage(vuln, fix):
 
     # VULN COMMIT
     coverage_results['vuln_commit'] = process_commit(vuln)
-    if not coverage_results['vuln_commit'].get('tests') or all(t.get('failed', True) for t in coverage_results['vuln_commit']['tests']):
+    if not coverage_results['vuln_commit'] or all(t.get('failed', True) for t in coverage_results['vuln_commit'].get('tests', [])):
         logging.error("No successful tests in vuln commit. Skipping processing.")
         return None
 
     logging.info(f"{vuln[:8]} completed.")
 
-    if coverage_results.get('failed', {}).get('status', False): 
-        extract_test_covering_git_changes(coverage_results['vuln_commit'].get('tests', []), git_changed_files)
+    if coverage_results.get('vuln_commit', {}).get('failed', {}).get('status', True):
+        logging.error("Vuln commit processing failed. Skipping processing.")
+        return None
+
+    extract_test_covering_git_changes(coverage_results.get('vuln_commit', {}), git_changed_files)
     logging.info(f"Extracted tests covering changed files in pair ({vuln[:8]}, {fix[:8]}).")
     logging.info(f"Now computing energy for {vuln[:8]}.")
     
-    kept_tests = [t for t in coverage_results['vuln_commit'].get('tests', []) if t.get('keep', True) and not t.get('failed', True)]
+    kept_tests = [t for t in coverage_results.get('vuln_commit', {}).get('tests', []) if t.get('keep', True) and not t.get('failed', True)]
     
     prepare_for_energy_measurement()
     for test in kept_tests:
         measure_test(rapl_pkg, test, vuln)
+
+    return coverage_results
     
 def extract_test_covering_git_changes(coverage_results, target_files):  
     """
@@ -563,7 +579,7 @@ def main():
     except Exception as e:
         sys.exit(1)
 
-    for i, (vuln, fix) in enumerate(pairs):
+    for i, (vuln, fix) in enumerate(pairs[:10]):
         print(f"\n[{i+1}/{len(pairs)}] Processing Pair: {vuln[:8]} -> {fix[:8]}")
         
         coverage_dict = run_phase_1_coverage(vuln, fix)
