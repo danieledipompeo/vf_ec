@@ -1,9 +1,6 @@
 import os
 import logging
-import yaml
 import subprocess
-import urllib.request
-import sys
 import re
 from pathlib import Path
 
@@ -47,42 +44,6 @@ def get_covered_files(cwd):
                 covered.add(full_path)
     return list(covered)
 
-# def download_csv_if_missing(input_csv):
-#     if not os.path.exists(input_csv):
-#         print(f"Downloading input CSV from Gist to {input_csv}...")
-#         try:
-#             urllib.request.urlretrieve(GIST_CSV_URL, input_csv)
-#             print("Download complete.")
-#         except Exception as e:
-#             print(f"Error downloading CSV: {e}")
-#             sys.exit(1)
-
-# def read_configuration(config_file):
-#     #config_file = os.path.join(BASE_DIR, "config.yaml")
-#     if os.path.exists(config_file):
-#         try:
-#             with open(config_file, 'r') as f:
-#                 logging.info(f"Configuration loaded from {config_file}")
-#                 return yaml.safe_load(f)
-#         except Exception as e:
-#             logging.error(f"Error reading configuration file: {e}")
-#     else:
-#         logging.info(f"No configuration file found at {config_file}")
-
-#def run_command(command, cwd, ignore_errors=False):
-#    try:
-#        env = os.environ.copy()
-#        env["LC_ALL"] = "C"
-#        result = subprocess.run(command, cwd=cwd, shell=True, env=env,
-#                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-#        if result.returncode != 0 and not ignore_errors:
-#            logging.error(f"FAIL: {command}\nSTDERR: {result.stderr.strip()}")
-#            return False
-#        return True
-#    except Exception as e:
-#        logging.error(f"EXCEPTION: {e}")
-#        return False
-
 def sh(cmd: list[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> tuple[str, int, str]:
     print("+", " ".join(cmd), flush=True)
     out = subprocess.run(cmd, cwd=str(cwd) if cwd else None, env=env,
@@ -95,6 +56,8 @@ class MakeHandler:
     handler = logging.FileHandler("make_handler.log")
     logger.addHandler(handler)
     
+    GCDA_FOLDER = "coverage-per-test"
+    
     @staticmethod
     def clean(cwd):
         cmd = ["make", "clean"]
@@ -104,9 +67,44 @@ class MakeHandler:
     def build(cwd, n_proc=-1):
         cmd = ["make"]
         if n_proc == -1:
-            cmd.append('-j"$(nproc)"')
+            import os
+            nproc = os.cpu_count() or 1
+            cmd.append(f"-j{nproc}")
+        else:
+            cmd.append(f"-j{n_proc}")
         
-        sh(cmd, cwd)
+        _, errorcode, _ = sh(cmd, cwd)
+        return errorcode == 0
+
+
+    @staticmethod
+    def test(cwd, target, output_dir="."):
+        
+        output_dir = os.path.join(output_dir, MakeHandler.GCDA_FOLDER)
+        sh(["mkdir", "-p", output_dir])
+        env_test = os.environ.copy()
+        env_test["GCOV_PREFIX_STRIP"] = "3"
+        env_test["GCOV_PREFIX"] = os.path.join(output_dir, target)
+        
+        cmd = ["make", "test", f"TESTS={target}", "HARNESS_JOBS=1"]
+        try:
+            _, errorcode, _ = sh(cmd, cwd, env=env_test)
+            return errorcode == 0
+        except Exception as e:
+            MakeHandler.logger.error(f"Test '{target}' failed with exception: {e}")
+            return False
+        
+    @staticmethod
+    def coverage_file(root: Path, test_name: str) -> list[str]:
+        """
+        Retrieves a list of coverage file paths for a given test name.
+
+        :param root: The root directory where coverage files are located.
+        :param test_name: The name of the test for which coverage files are retrieved.
+        :return: A list of relative coverage file paths.
+        """
+        gcdas = sorted((root / MakeHandler.GCDA_FOLDER / test_name).glob("**/*.gcda"))
+        return [str(gcda.relative_to(root / MakeHandler.GCDA_FOLDER / test_name)).replace("gcda", "c") for gcda in gcdas]
 
 class GitHandler:
 
@@ -198,19 +196,20 @@ class EnergyHandler:
         perf_events = ",".join(events + ["cycles", "instructions"])
         
         pb = ProgressBar(iterations)
-        # perf_dir = os.path.join(OUTPUT_DIR, REPO_NAME, "perf")
+        output_dir = os.path.join(output_dir, "energy_measurements") 
         os.makedirs(output_dir, exist_ok=True)
 
         timeout_ms = test.get("timeout_ms", timeout_ms)  # e.g. 5s default, tune per test
-        EnergyHandler.logger.info(f"\nMeasuring energy for test '{test.get('name')}': "
+        EnergyHandler.logger.info(f"Measuring energy for test '{test.get('name')}': "
               f"{iterations} iterations × {timeout_ms}ms timeout each")
 
         for iteration in range(iterations):
             pb.set(iteration)
 
             perf_out = os.path.join(output_dir, f"{commit}_{test.get('name')}__{iteration}.csv")
-
-            wrapped_cmd = EnergyHandler._wrap_until_timeout(test["cmd"], timeout_ms)
+            # TODO : handle cmd through MakeHandler
+            cmd = ["make", "test", f"TESTS={test.get('name')}", "HARNESS_JOBS=1"]
+            wrapped_cmd = EnergyHandler._wrap_until_timeout(cmd, timeout_ms)
 
             # Build perf as argv list (safer than huge shell string)
             perf_argv = [
@@ -247,7 +246,7 @@ class EnergyHandler:
             time.sleep(cool_down_sec)
 
     @staticmethod
-    def _wrap_until_timeout(test_cmd: str, timeout_ms: int) -> str:
+    def _wrap_until_timeout(test_cmd: list[str], timeout_ms: int) -> str:
         import shlex
         """
         Returns a bash command that runs `test_cmd` repeatedly until timeout expires.
@@ -268,7 +267,7 @@ class EnergyHandler:
                 set -e
                 end=$((SECONDS + {timeout_s}))
                 while [ $SECONDS -lt $end ]; do
-                  {test_cmd}
+                  {" ".join(test_cmd)}
                 done
                 """
             )

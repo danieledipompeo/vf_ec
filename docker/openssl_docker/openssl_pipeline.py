@@ -1,130 +1,15 @@
 import os
-import subprocess
 import csv
 import logging
 import json
-import time
 import sys
-import urllib.request
 import pandas as pd
-import re
-import shlex
-import yaml
+from pathlib import Path
 
 from config import Config   
-from common import EnergyHandler, GitHandler, ProgressBar
+from common import EnergyHandler, GitHandler, ProgressBar, MakeHandler, sh
 from project import Project, ProjectFactory
 
-
-#class ProgressBar:
-#    def __init__(self, total, length=40, step=1):
-#        self.total = total
-#        self.length = length
-#        self.step = step
-#
-#    def update(self, i):
-#        progress = (i + 1) / self.total
-#        filled = int(self.length * progress)
-#        bar = '█' * filled + '░' * (self.length - filled)
-#        print(f"\r[{bar}] {i+1}/{self.total}", end='', flush=True)
-#
-#    def log(self, msg):
-#        print()
-#        print(msg)
-#        self.update(self.current)
-#
-#    def set(self, i):
-#        self.current = i
-#        self.update(i)
-
-# ==========================================
-# CONFIGURATION
-# ==========================================
-#REPO_NAME = "openssl"
-#TARGET_DURATION_SEC = 2.0
-#CSV_WRITE_INTERVAL = 50
-#TEST_LIMIT = None
-#
-#GIST_CSV_URL = "https://gist.githubusercontent.com/waheed-sep/935cfc1ba42b2475d45336a4c779cbc8/raw/ea91568360d87979373a7eca38f289c9bf30d103/cwe_projects.csv"
-
-# ==========================================
-# PATHS
-# ==========================================
-#BASE_DIR = "/app"
-#INPUT_DIR = os.path.join(BASE_DIR, "inputs")
-#OUTPUT_DIR = os.path.join(BASE_DIR, "output")
-#INPUT_CSV = os.path.join(INPUT_DIR, "cwe_projects.csv")
-#PROJECT_DIR = os.path.join(INPUT_DIR, REPO_NAME)
-#LOG_DIR = os.path.join(OUTPUT_DIR, "log")
-#CACHE_DIR = os.path.join(LOG_DIR, "cache")
-#GCDA_DIR = os.path.join(OUTPUT_DIR, "gcda_files")
-
-#ITERATIONS = 5
-#DEFAULT_TIMEOUT_MS = 1000  # 1 second
-#COOL_DOWN_TO_SEC = 1.0
-
-ENERGY_RE = re.compile(r'\bpower/energy-[^/\s]+/?\b')
-
-#def prepare_directories():
-#    for d in [INPUT_DIR, OUTPUT_DIR, LOG_DIR, CACHE_DIR, GCDA_DIR]:
-#        if not os.path.exists(d): os.makedirs(d)
-        
-
-#def setup_logging():
-#    LOG_FILE = os.path.join(LOG_DIR, "pipeline_execution.log")
-#    logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# ==========================================
-# HELPERS
-# ==========================================
-def run_command(command, cwd, ignore_errors=False):
-    try:
-        env = os.environ.copy()
-        env["LC_ALL"] = "C"
-        result = subprocess.run(command, cwd=cwd, shell=True, env=env,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-        if result.returncode != 0 and not ignore_errors:
-            logging.error(f"FAIL: {command}\nSTDERR: {result.stderr.strip()}")
-            return False
-        return True
-    except Exception as e:
-        logging.error(f"EXCEPTION: {e}")
-        return False
-
-def save_json(filepath, data):
-    try:
-        with open(filepath, 'w') as f:
-            json.dump(data, f, indent=4)
-    except Exception as e:
-        logging.error(f"JSON Save Error: {e}")
-
-def load_json(filepath):
-    if os.path.exists(filepath):
-        try:
-            with open(filepath, 'r') as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
-
-#def clean_repo(cwd):
-#    run_command("git reset --hard", cwd)
-#    run_command("git clean -fdx", cwd)
-#
-#def download_csv_if_missing():
-#    if not os.path.exists(INPUT_CSV):
-#        print(f"Downloading input CSV from Gist to {INPUT_CSV}...")
-#        try:
-#            urllib.request.urlretrieve(GIST_CSV_URL, INPUT_CSV)
-#            print("Download complete.")
-#        except Exception as e:
-#            print(f"Error downloading CSV: {e}")
-#            sys.exit(1)
-
-# def get_git_diff_files(cwd, commit_hash):
-    # cmd = f"git diff-tree --no-commit-id --name-only -r {commit_hash}"
-    # result = subprocess.run(cmd, cwd=cwd, shell=True, stdout=subprocess.PIPE, text=True)
-    # return {f for f in result.stdout.strip().split('\n') if f}
 
 def get_covered_files(cwd):
     """
@@ -143,91 +28,7 @@ def get_covered_files(cwd):
                 covered.add(full_path)
     return list(covered)
 
-
-# ==========================================
-# OPENSSL CONFIGURATION & BUILD
-# ==========================================
-#def configure_openssl(cwd, coverage=False):
-#    config_args = ["./config", "-d", "no-shared", "no-asm", "no-threads"]
-#    cflags = "-fPIC -Wno-error -Wno-implicit-function-declaration -Wno-format-security -std=gnu89 -O0"
-#    lflags = "-no-pie"
-#
-#    if coverage:
-#        cflags += " --coverage"
-#        lflags += " --coverage"
-#
-#    full_cmd = f'CC="gcc {cflags} {lflags}" {" ".join(config_args)}'
-#    
-#    if run_command(full_cmd, cwd, ignore_errors=True):
-#        return True
-#    
-#    logging.info("Standard config failed, trying ./Configure linux-x86_64...")
-#    fallback_cmd = f'CC="gcc {cflags} {lflags}" ./Configure linux-x86_64 no-shared no-asm'
-#    return run_command(fallback_cmd, cwd)
-#
-#def build_openssl(cwd):
-#    run_command("make clean", cwd, ignore_errors=True)
-#    run_command("make depend", cwd, ignore_errors=True)
-#    if run_command("make", cwd): 
-#        return True
-#    logging.error("Make failed.")
-#    return False
-#
-#def get_openssl_tests(cwd):
-#    tests = []
-#    recipes_dir = os.path.join(cwd, "test", "recipes")
-#    test_dir = os.path.join(cwd, "test")
-#
-#    # Strategy 1: Modern OpenSSL
-#    if os.path.exists(recipes_dir):
-#        logging.info("Detected Modern OpenSSL.")
-#        try:
-#            files = sorted(os.listdir(recipes_dir))
-#            for f in files:
-#                if f.endswith(".t"):
-#                    t_name = f[:-2]
-#                    # Modern: 'make test' runs the test wrapper
-#                    tests.append({
-#                        "name": t_name, 
-#                        "cmd": f"make test TESTS='{t_name}'",
-#                        "type": "modern"
-#                    })
-#        except Exception: pass
-#
-#    # Strategy 2: Legacy OpenSSL
-#    elif os.path.exists(test_dir):
-#        logging.info("Detected Legacy OpenSSL.")
-#        try:
-#            files = sorted(os.listdir(test_dir))
-#            for f in files:
-#                if f.startswith("test_") and f.endswith(".c"):
-#                    t_name = f[:-2]
-#                    # Legacy: We must BUILD with 'make' then RUN the binary
-#                    # Binary location varies: sometimes ./test_sha, sometimes ./test/test_sha
-#                    tests.append({
-#                        "name": t_name, 
-#                        "cmd": f"make {t_name}", # Command to BUILD (for Coverage phase)
-#                        "run_bin": f"test/{t_name}", # Binary to RUN (for Energy phase)
-#                        "type": "legacy"
-#                    })
-#                elif f.endswith("test.c"):
-#                     t_name = f[:-2]
-#                     tests.append({
-#                        "name": t_name, 
-#                        "cmd": f"make {t_name}",
-#                        "run_bin": f"test/{t_name}",
-#                        "type": "legacy"
-#                     })
-#        except Exception: pass
-#            
-#    if TEST_LIMIT and tests: tests = tests[:TEST_LIMIT]
-#    return tests
-
-# ==========================================
-# PHASE 1: COVERAGE
-# ==========================================
-
-def process_commit(project : Project, commit: str, coverage: bool = True) -> (list | None):
+def process_commit(project : Project, commit: str, coverage: bool = True) -> list[dict]:
     """ 
     Process a single commit: checkout, build with coverage, run tests, collect coverage data.
 
@@ -243,17 +44,21 @@ def process_commit(project : Project, commit: str, coverage: bool = True) -> (li
     
     commit_tests = []
     
-    if not project.configure(project.input_dir, coverage=coverage): 
-        logging.error(f"Configuration failed for commit {commit[:8]}.")
-        return None
-    if not project.build(project.input_dir): 
+    #if not project.configure(project.input_dir, coverage=coverage): 
+    #    logging.error(f"Configuration failed for commit {commit[:8]}.")
+    #    return None
+    #if not project.build(project.input_dir): 
+    #    logging.error(f"Build failed for commit {commit[:8]}.")
+    #    return None
+
+    if not project.build(coverage=coverage):
         logging.error(f"Build failed for commit {commit[:8]}.")
-        return None
+        return []
     
-    suite = project.get_test(project.input_dir)
+    suite = project.get_test()
     if not suite:
         logging.error("No tests found.")
-        return None
+        return []
     
     print(f"\nRunning {len(suite)} tests...")
 
@@ -262,149 +67,25 @@ def process_commit(project : Project, commit: str, coverage: bool = True) -> (li
         pb.set(i)
 
         test = {
-            "name": t['name'],
-            "failed": False,
-            "cmd": t['cmd'],
+            "name": t,
+            "passed": False,
             "covered_files": []
         }
 
-        # Clean previous coverage data
-        run_command("find . -name '*.gcda' -delete", project.input_dir)
-        
-        # For Coverage, 'make target' is fine as it usually runs the test too or we assume build covers it.
-        # But usually we need to RUN it to get coverage.
-        # If legacy, running 'make test_name' might NOT run it.
-        # Let's force run if legacy.
+        project_dir = Path(project.input_dir) 
 
-        if not run_command(test.get('cmd'), project.input_dir):
-            if test.get("type") == "legacy":
-                logging.info(f"[Legacy] Running binary for test: {test.get('name')}")
-                if not run_command(test.get('run_bin'), project.input_dir):
-                    logging.warning(f"Test Build/Run Failed: {test.get('name')}")
-                    test['failed'] = True
-                    commit_tests.append(test)
-                    continue
-            logging.warning(f"Test Build/Run Failed: {test.get('name')}")
-            test['failed'] = True
-            commit_tests.append(test)
-            continue
+        # Clean previous coverage data
+        sh(["find", ".", "-name", "*.gcda", "-delete"], Path(project.output_dir))
         
-        covered = get_covered_files(project.input_dir)
+
+        # run test
+        test['passed'] = MakeHandler.test(project_dir, t, output_dir=project.output_dir)
+        
+        covered = MakeHandler.coverage_file(Path(project.output_dir),test["name"])
         test['covered_files'] = covered
         commit_tests.append(test)
         
     return commit_tests
-
-# def prepare_for_energy_measurement():
-#     """
-#     Prepare the project for energy measurement.
-#     Build the project without coverage.
-    
-#     :param rapl_pkg: Description
-#     :param test: Description
-#     :param commit: Description
-#     """
-#     print("\nPreparing project for energy measurement...")
-
-#     configure_openssl(PROJECT_DIR, coverage=False)
-#     build_openssl(PROJECT_DIR)
-    
-#def run_phase_1_coverage(vuln, fix):
-#    """
-#    Run Phase 1 coverage analysis on a vulnerability and its fix commits.
-#    This function analyzes test coverage for changed files between a vulnerability
-#    commit and its corresponding fix commit. It processes both commits by running
-#    tests, extracting relevant test coverage, and measuring energy consumption
-#    using RAPL (Running Average Power Limit) for each successful test.
-#    Args:
-#        vuln (str): The git commit hash of the vulnerability commit.
-#        fix (str): The git commit hash of the fix commit.
-#    Returns:
-#        dict or None: A dictionary containing coverage analysis results with the structure:
-#            {
-#                "project": str,
-#                    "hash": str,
-#                    "failed": {"status": bool, "reason": str},
-#                    "tests": list
-#                    "hash": str,
-#                    "failed": {"status": bool, "reason": str},
-#                    "tests": list
-#        Returns None if:
-#        - Checking out the fix commit fails
-#        - No changed files are found in git diff
-#        - No successful tests exist in either commit
-#    """
-#    logging.info(f"--- Phase 1: Coverage {vuln[:8]} -> {fix[:8]} ---")
-#    coverage_results = {
-#        "project": REPO_NAME,
-#        "vuln_commit": {
-#            "hash": vuln,
-#            "failed":{
-#                "status": False,
-#                "reason": ""
-#            },
-#            "tests": []
-#        },
-#        "fix_commit": {
-#            "hash": fix,
-#            "failed": {
-#                "status": False,
-#                "reason": ""
-#            },
-#            "tests": []
-#        }
-#    }
-#    
-#    clean_repo(PROJECT_DIR)
-#    if not run_command(f"git checkout -f {fix}", PROJECT_DIR):
-#        logging.error(f"Failed to checkout fix commit: {fix}")
-#        return None
-#    
-#    git_changed_files= get_git_diff_files(PROJECT_DIR, fix)
-#    
-#    if not git_changed_files:
-#        logging.error("No target files found in git diff.")
-#        return None
-#    
-#    # FIX COMMIT
-#    coverage_results['fix_commit'] = process_commit(fix)
-#    if not coverage_results['fix_commit'] or all(t.get('failed', True) for t in coverage_results['fix_commit'].get('tests', [])):
-#        logging.error("No successful tests in fix commit. Skipping processing.")
-#        return None
-#    
-#    extract_test_covering_git_changes(coverage_results.get('fix_commit', {}), git_changed_files)
-#    logging.info(f"Extracted tests covering changed files in pair ({vuln[:8]}, {fix[:8]}).")
-#    
-#    logging.info(f"Now computing energy for {fix[:8]}.")
-#    
-#    # extract RAPL package events
-#    rapl_pkg = EnergyHandler.detect_rapl()
-#
-#    kept_tests = [t for t in coverage_results['fix_commit'].get('tests', []) if t.get('keep', True) and not t.get('failed', True)]
-#
-#    prepare_for_energy_measurement()
-#    for test in kept_tests:
-#        EnergyHandler.measure_test(rapl_pkg, test, fix)
-#
-#    # VULN COMMIT
-#    coverage_results['vuln_commit'] = process_commit(vuln)
-#    if not coverage_results['vuln_commit'] or all(t.get('failed', True) for t in coverage_results['vuln_commit'].get('tests', [])):
-#        logging.error("No successful tests in vuln commit. Skipping processing.")
-#        return None
-#
-#    logging.info(f"{vuln[:8]} completed.")
-#
-#    extract_test_covering_git_changes(coverage_results.get('vuln_commit', {}), git_changed_files)
-#    logging.info(f"Extracted tests covering changed files in pair ({vuln[:8]}, {fix[:8]}).")
-#    logging.info(f"Now computing energy for {vuln[:8]}.")
-#    
-#    kept_tests = [t for t in coverage_results.get('vuln_commit', {}).get('tests', []) if t.get('keep', True) and not t.get('failed', True)]
-#    
-#    prepare_for_energy_measurement()
-#    for test in kept_tests:
-#        EnergyHandler.measure_test(rapl_pkg, test, vuln)
-#
-#    return coverage_results
 
 def coverage_energy(project: Project, commit: str, logger: logging.Logger):
     process_results = {
@@ -428,7 +109,7 @@ def coverage_energy(project: Project, commit: str, logger: logging.Logger):
         return None
     
     process_results['tests'] = process_commit(project, commit)
-    if all(t.get('failed', True) for t in process_results.get('tests', [])):
+    if all(not t.get('passed', False) for t in process_results.get('tests', [])):
         logger.error("No successful tests in fix commit. Skipping processing.")
         return None
     
@@ -440,11 +121,10 @@ def coverage_energy(project: Project, commit: str, logger: logging.Logger):
     # extract RAPL package events
     rapl_pkg = EnergyHandler.detect_rapl()
 
-    kept_tests = [t for t in process_results.get('tests', []) if t.get('keep', True) and not t.get('failed', True)]
+    kept_tests = [t for t in process_results.get('tests', []) if t.get('keep', True) and t.get('passed', False)]
 
     # prepare_for_energy_measurement()
-    project.configure(project.input_dir, coverage=False)
-    project.build(project.input_dir)
+    project.build(coverage=False)
     for test in kept_tests:
         EnergyHandler.measure_test(rapl_pkg, test, commit, project.output_dir, project_dir=project.input_dir)
 
@@ -452,7 +132,9 @@ def coverage_energy(project: Project, commit: str, logger: logging.Logger):
 
 
 def process_pair(project: Project, vuln: str, fix: str, logger: logging.Logger):
-    """Run coverage+energy for a vuln/fix pair and collate results."""
+    """
+    Run coverage+energy for a vuln/fix pair and collate results.
+    """
 
     pair_result = {
         "project": project.name,
@@ -471,7 +153,7 @@ def process_pair(project: Project, vuln: str, fix: str, logger: logging.Logger):
     return pair_result
     
     
-def extract_test_covering_git_changes(coverage_results, target_files):  
+def extract_test_covering_git_changes(coverage_results: dict, target_files: set):  
     """
     Mark "keep" in tests that cover changed files. 
     
@@ -481,148 +163,10 @@ def extract_test_covering_git_changes(coverage_results, target_files):
 
     for target in target_files:
         for test in coverage_results.get('tests', []):
-            if coverage_results.get('failed', {}).get('status', True):
-                continue
-        
-            for test in coverage_results.get('tests', []):
-                covered_files = test.get('covered_files', [])
-                test['keep'] = target in covered_files
-
-
-# ==========================================
-# PHASE 2: ENERGY
-# ==========================================
-#def detect_rapl(perf_bin="perf"):
-#    # --no-desc makes output easier to parse if supported; if not, fall back.
-#    cmd = [perf_bin, "list", "--no-desc"]
-#    try:
-#        out = subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT)
-#    except subprocess.CalledProcessError:
-#        out = subprocess.check_output([perf_bin, "list"], text=True, stderr=subprocess.STDOUT)
-#
-#    events = set()
-#    for line in out.splitlines():
-#        # Grab all matches from the line (some lines may include multiple tokens)
-#        for m in ENERGY_RE.findall(line):
-#            # Normalize to the canonical perf selector form with trailing '/'
-#            if not m.endswith("/"):
-#                m += "/"
-#            events.add(m)
-#
-#    return sorted(events)
-
-
-#def _wrap_until_timeout(test_cmd: str, timeout_ms: int) -> str:
-#    """
-#    Returns a bash command that runs `test_cmd` repeatedly until timeout expires.
-#    - uses monotonic-ish wall clock via SECONDS (bash built-in, second resolution)
-#    - avoids killing a running iteration mid-command (it checks deadline BETWEEN iterations)
-#    """
-#    # Use bash -lc so we can rely on bash features and keep quoting predictable
-#    # SECONDS is integer seconds since shell start; good enough for energy runs (>= 2-5s).
-#    timeout_s = max(1, int((timeout_ms + 999) / 1000))  # ceil to seconds
-#
-#    # Important:
-#    # - `set -e` makes failures stop the loop and propagate non-zero to perf (you want this)
-#    # - you can change to `|| true` if you prefer "keep looping even if one iteration fails"
-#    wrapped = (
-#        "bash -lc "
-#        + shlex.quote(
-#            f"""
-#            set -e
-#            end=$((SECONDS + {timeout_s}))
-#            while [ $SECONDS -lt $end ]; do
-#              {test_cmd}
-#            done
-#            """
-#        )
-#    )
-#    return wrapped
-#
-#def measure_test(pkg_event, test, commit):#, core_event):
-#    # Accept a list from detect_rapl() or a single event string.
-#    if isinstance(pkg_event, (list, tuple, set)):
-#        events = [str(e).strip() for e in pkg_event if str(e).strip()]
-#    elif pkg_event:
-#        events = [str(pkg_event).strip()]
-#    else:
-#        events = []
-#
-#    if not events:
-#        events = ["power/energy-pkg/"]
-#
-#    perf_events = ",".join(events + ["cycles", "instructions"])
-#    
-#    pb = ProgressBar(ITERATIONS)
-#    perf_dir = os.path.join(OUTPUT_DIR, REPO_NAME, "perf")
-#    os.makedirs(perf_dir, exist_ok=True)
-#
-#    timeout_ms = test.get("timeout_ms", DEFAULT_TIMEOUT_MS)  # e.g. 5s default, tune per test
-#    print(f"\nMeasuring energy for test '{test.get('name')}': "
-#          f"{ITERATIONS} iterations × {timeout_ms}ms timeout each")
-#
-#    for iteration in range(ITERATIONS):
-#        pb.set(iteration)
-#
-#        perf_out = os.path.join(perf_dir, f"{commit}_{test.get('name')}__{iteration}.csv")
-#
-#        wrapped_cmd = _wrap_until_timeout(test["cmd"], timeout_ms)
-#
-#        # Build perf as argv list (safer than huge shell string)
-#        perf_argv = [
-#            "perf", "stat",
-#            "-a",
-#            "-e", f"{perf_events}",
-#            "-x,", "--output", perf_out,
-#            "--",
-#        ]
-#        # wrapped_cmd already includes "bash -lc '<script>'" so we run via sh -c? Not needed.
-#        # But since wrapped_cmd is a single string, we can still do: ["sh","-c", wrapped_cmd]
-#        perf_argv += ["sh", "-c", wrapped_cmd]
-#
-#        res = subprocess.run(
-#            perf_argv, 
-#            cwd=PROJECT_DIR, 
-#            stdout=subprocess.PIPE, 
-#            stderr=subprocess.PIPE, 
-#            text=True)
-#        
-#        if res.returncode != 0: 
-#            print(f"\n[ERROR] Test {test.get('name')} failed during energy measurement. {res.stderr.strip()}")
-#            logging.error(f"[STD ERR] {test.get('name')}: {res.stderr}")
-#            if os.path.exists(perf_out):
-#                os.remove(perf_out)
-#            logging.error(f"Perf Measurement removed due to error.")
-#            return None
-#        
-#        logging.info(f"[COOL DOWN] {COOL_DOWN_TO_SEC} seconds...")
-#        time.sleep(COOL_DOWN_TO_SEC)
-#        
-#    return None
-
-# def read_configuration():
-#     config_file = os.path.join(BASE_DIR, "config.yaml")
-#     if os.path.exists(config_file):
-#         try:
-#             with open(config_file, 'r') as f:
-#                 logging.info(f"Configuration loaded from {config_file}")
-#                 return yaml.safe_load(f)
-#         except Exception as e:
-#             logging.error(f"Error reading configuration file: {e}")
-#     else:
-#         logging.info(f"No configuration file found at {config_file}")
-
-# ==========================================
-# MAIN
-# ==========================================
+            covered_files = test.get('covered_files', [])
+            test['keep'] = target in covered_files
 
 def main():
-    # prepare_directories()
-    # setup_logging()
-    # download_csv_if_missing()
-
-    # read_configuration() 
-
     configuration = Config(os.path.join(os.path.dirname(__file__), "config.yaml"))
     
     logger = logging.getLogger("Main")
