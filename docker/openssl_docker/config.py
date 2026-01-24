@@ -23,6 +23,9 @@ class Config:
 
         # Logging setup
         self.logger = logging.getLogger(self.__class__.__name__)
+        if not os.path.exists(self.config.get("paths").get("log_dir")):
+            os.makedirs(self.config.get("paths").get("log_dir"), exist_ok=True)
+            
         handler = logging.FileHandler(os.path.join(
             self.config.get("paths", {}).get("log_dir", "."), "config.log"))
         self.logger.addHandler(handler)
