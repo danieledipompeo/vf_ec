@@ -1,7 +1,3 @@
-project:
-  name: openssl
-  repository: ""  # Git repository URL
-
 paths:
   base_dir: /app
   input_dir: /app/inputs
@@ -12,24 +8,36 @@ paths:
 
 dataset:
   csv_url: "https://gist.githubusercontent.com/waheed-sep/935cfc1ba42b2475d45336a4c779cbc8/raw/ea91568360d87979373a7eca38f289c9bf30d103/cwe_projects.csv"
-  csv_file: /app/inputs/cwe_projects.csv
+  csv_file: cwe_projects.csv
 
-build:
-  commands:
-    configure:
-      primary: "./config -d no-shared no-asm no-threads"
-      fallback: "./Configure linux-x86_64 no-shared no-asm"
-    compile:
-      clean: "make clean"
-      depend: "make depend"
-      make: "make"
-  flags:
-    cflags: "-fPIC -Wno-error -Wno-implicit-function-declaration -Wno-format-security -std=gnu89 -O0"
-    lflags: "-no-pie"
-    coverage_cflags: "--coverage"
-    coverage_lflags: "--coverage"
-  compiler: "gcc"
+project:
+  - ffmpeg:
+      name: "FFmpeg"
+      repository: "https://github.com/FFmpeg/FFmpeg.git"
+      build:
+        commands: {}
+        flags: {}
+        compiler: ""
 
+  - openssl:
+      name: "openssl"
+      repository: "https://github.com/openssl/openssl"
+      build:
+        commands:
+          configure:
+            primary: "./config -d no-shared no-asm no-threads"
+            fallback: "./Configure linux-x86_64 no-shared no-asm"
+          compile:
+            clean: "make clean"
+            depend: "make depend"
+            make: "make"
+        flags:
+          cflags: "-fPIC -Wno-error -Wno-implicit-function-declaration -Wno-format-security -std=gnu89 -O0"
+          lflags: "-no-pie"
+          coverage_cflags: "--coverage"
+          coverage_lflags: "--coverage"
+        compiler: "gcc"
+  
 test:
   strategies:
     modern:

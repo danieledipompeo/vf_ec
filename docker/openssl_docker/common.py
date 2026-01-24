@@ -25,8 +25,6 @@ class ProgressBar:
         self.current = i
         self.update(i)
 
-GIST_CSV_URL = "https://gist.githubusercontent.com/waheed-sep/935cfc1ba42b2475d45336a4c779cbc8/raw/ea91568360d87979373a7eca38f289c9bf30d103/cwe_projects.csv"
-
 def get_covered_files(cwd):
     """
     Scans the given directory for .gcda files and maps them to their corresponding .c source files.
@@ -47,64 +45,9 @@ def get_covered_files(cwd):
 def sh(cmd: list[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> tuple[str, int, str]:
     print("+", " ".join(cmd), flush=True)
     out = subprocess.run(cmd, cwd=str(cwd) if cwd else None, env=env,
-                         check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                         text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     return out.stdout, out.returncode, out.stderr
 
-
-class MakeHandler:
-    logger = logging.getLogger("MakeHandler")
-    handler = logging.FileHandler("make_handler.log")
-    logger.addHandler(handler)
-    
-    GCDA_FOLDER = "coverage-per-test"
-    
-    @staticmethod
-    def clean(cwd):
-        cmd = ["make", "clean"]
-        sh(cmd, cwd)
-    
-    @staticmethod   
-    def build(cwd, n_proc=-1):
-        cmd = ["make"]
-        if n_proc == -1:
-            import os
-            nproc = os.cpu_count() or 1
-            cmd.append(f"-j{nproc}")
-        else:
-            cmd.append(f"-j{n_proc}")
-        
-        _, errorcode, _ = sh(cmd, cwd)
-        return errorcode == 0
-
-
-    @staticmethod
-    def test(cwd, target, output_dir="."):
-        
-        output_dir = os.path.join(output_dir, MakeHandler.GCDA_FOLDER)
-        sh(["mkdir", "-p", output_dir])
-        env_test = os.environ.copy()
-        env_test["GCOV_PREFIX_STRIP"] = "3"
-        env_test["GCOV_PREFIX"] = os.path.join(output_dir, target)
-        
-        cmd = ["make", "test", f"TESTS={target}", "HARNESS_JOBS=1"]
-        try:
-            _, errorcode, _ = sh(cmd, cwd, env=env_test)
-            return errorcode == 0
-        except Exception as e:
-            MakeHandler.logger.error(f"Test '{target}' failed with exception: {e}")
-            return False
-        
-    @staticmethod
-    def coverage_file(root: Path, test_name: str) -> list[str]:
-        """
-        Retrieves a list of coverage file paths for a given test name.
-
-        :param root: The root directory where coverage files are located.
-        :param test_name: The name of the test for which coverage files are retrieved.
-        :return: A list of relative coverage file paths.
-        """
-        gcdas = sorted((root / MakeHandler.GCDA_FOLDER / test_name).glob("**/*.gcda"))
-        return [str(gcda.relative_to(root / MakeHandler.GCDA_FOLDER / test_name)).replace("gcda", "c") for gcda in gcdas]
 
 class GitHandler:
 
@@ -126,7 +69,8 @@ class GitHandler:
     @staticmethod
     def clone_repo(cwd, repo_url):
         cmd = ['git', 'clone', repo_url]
-        sh(cmd, cwd)
+        if not os.path.exists(os.path.join(cwd, os.path.basename(repo_url).replace('.git',''))):
+            sh(cmd, cwd)
 
     
 

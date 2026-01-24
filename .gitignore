@@ -6,3 +6,7 @@ vfec_results/log_tc_results.txt
 .~lock*
 vfec_results/log/*
 /log
+inputs/ 
+output/
+.vscode
+__pycache__
