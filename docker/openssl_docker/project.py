@@ -1,5 +1,6 @@
 # create an abstract class for projects
 from abc import ABC, abstractmethod
+from glob import glob
 import os
 import logging
 from pathlib import Path
@@ -90,9 +91,9 @@ class Project(ABC):
         env_test["GCOV_PREFIX"] = os.path.join(output_dir, test_name)
         return env_test
 
-    def _run(self, cmd: list[str], test_name: str, env_test: dict) -> tuple[bool, Exception | None]:
+    def _run(self, cmd: list[str], test_name: str, env_test: dict, cwd: Path) -> tuple[bool, Exception | None]:
         try:
-            _, errorcode, _ = sh(cmd, cwd=Path(self.input_dir), env=env_test)
+            _, errorcode, _ = sh(cmd, cwd=cwd, env=env_test)
             return errorcode == 0, None
         except Exception as e:
             # self.logger.error(f"Test '{test_name}' failed with exception: {e}")
@@ -101,60 +102,26 @@ class Project(ABC):
     def build(self, coverage=False, n_proc=-1):
         if os.path.exists(os.path.join(self.input_dir, "Makefile")):
             self._clean()
-        if not self._configure(self.input_dir, coverage=coverage):
+        if not self._configure(cwd=Path(self.input_dir), coverage=coverage):
             self.logger.error("Configuration failed, cannot build.")
             return False
         return self._build(n_proc=n_proc)
 
-    def _configure(self, cwd, coverage=False):
+    def _configure(self, cwd: Path, coverage=False):
         pass
 
 class OpenSSLProject(Project):
 
     def __init__(self, output_dir, input_dir) -> None:
         super().__init__()
-        #self.logger = logging.getLogger(self.__class__.__name__)
-        #handler = logging.FileHandler(os.path.join(output_dir, "log.log"))
-        #self.logger.addHandler(handler)
-        #self.logger.setLevel(logging.DEBUG)
 
         self._init(output_dir, input_dir, "openssl", "https://github.com/openssl/openssl")
-        
-        # self.name = "openssl"
-        # self.output_dir = os.path.join(output_dir, self.name)
-        
-        # if not os.path.exists(self.output_dir):
-            # os.makedirs(self.output_dir)
-            
-        # self.input_dir = os.path.join(input_dir, self.name)
-        # if (not os.path.exists(self.input_dir)) or (not os.path.exists(os.path.join(self.input_dir, ".git"))):
-            # GitHandler.clone_repo(input_dir, "https://github.com/openssl/openssl")
-
 
     def run_test(self, test_name: str) -> tuple[bool, Exception | None]:
-        # output_dir = os.path.join(self.output_dir, Project.GCDA_FOLDER)
-        # sh(["mkdir", "-p", output_dir])
-        # env_test = os.environ.copy()
-        # env_test["GCOV_PREFIX_STRIP"] = "3"
-        # env_test["GCOV_PREFIX"] = os.path.join(output_dir, test_name)
         env_test = self._prepare_env_for_testing(test_name)
         
         cmd = ["make", "test", f"TESTS={test_name}", "HARNESS_JOBS=1"]
-        return self._run(cmd, test_name, env_test)
-        # try:
-            # _, errorcode, _ = sh(cmd, cwd=Path(self.input_dir), env=env_test)
-            # return errorcode == 0
-        # except Exception as e:
-            # self.logger.error(f"Test '{test_name}' failed with exception: {e}")
-            # return False
-
-    # def build(self, coverage=False, n_proc=-1):
-        # if os.path.exists(os.path.join(self.input_dir, "Makefile")):
-            # self._clean()
-        # if not self._configure(self.input_dir, coverage=coverage):
-            # self.logger.error("Configuration failed, cannot build.")
-            # return False
-        # return self._build(n_proc=n_proc)
+        return self._run(cmd, test_name, env_test, cwd=Path(self.input_dir))
         
     def get_test(self) -> list[str]:
         out, _, _ = sh(['make', 'list-tests'], cwd=Path(self.input_dir))
@@ -162,7 +129,7 @@ class OpenSSLProject(Project):
             for line in out.splitlines()
             if line.strip() and not line.lstrip().startswith(("make", "Files=", "Tests=", "Result:"))]
     
-    def _configure(self, cwd, coverage=False):
+    def _configure(self, cwd: Path, coverage=False):
         config_args = ["./config", "no-asm", "-g", "-O0"] 
         if coverage:
             config_args.append("--coverage")
@@ -184,25 +151,26 @@ class OpenSSLProject(Project):
     
 class VimProject(Project):
 
+    TEST_DIR = "src/testdir"
+
     def __init__(self, output_dir, input_dir):
         super().__init__()
         
         self._init(output_dir, input_dir, "vim", "https://github.com/vim/vim")
-        
-        # if (not os.path.exists(self.input_dir)) or (not os.path.exists(os.path.join(self.input_dir, ".git"))):
-            # GitHandler.clone_repo(input_dir, "https://github.com/vim/vim")
 
     def run_test(self, test_name: str) -> tuple[bool, Exception | None]:
         env_test = self._prepare_env_for_testing(test_name)
         
         cmd = ["make", test_name, "HARNESS_JOBS=1"]
-        return self._run(cmd, test_name, env_test)
+        return self._run(cmd, test_name, env_test, 
+                         cwd=Path(os.path.join(self.input_dir, "src", "testdir")))
 
     def get_test(self) -> list[str]:
-        out, _, _ = sh(['make', '-s', 'fate-list'], cwd=Path(self.input_dir))
-        return [line.strip().split()[0]
-            for line in out.splitlines()
-            if line.strip() and not line.lstrip().startswith(("make", "Files=", "Tests=", "Result:", "GEN"))]
+        test_files = [Path(f).stem 
+                      for f in glob.glob(f"inputs/vim/{VimProject.TEST_DIR}/test_*.vim") + 
+                               glob.glob(f"inputs/vim/{VimProject.TEST_DIR}/test_*.in")]
+        return test_files
+        
     
     def _configure(self, cwd, coverage=False):
         # Vim configure
@@ -237,21 +205,6 @@ class FfmpegProject(Project):
         
         self._init(output_dir, input_dir, "FFmpeg","https://github.com/FFmpeg/FFmpeg.git")
         
-        # self.logger = logging.getLogger(self.__class__.__name__)
-        # handler = logging.FileHandler(os.path.join(output_dir,  "log.log"))
-        # self.logger.addHandler(handler)
-        # self.logger.setLevel(logging.DEBUG)
-        # 
-        # self.name = "FFmpeg"
-        # self.output_dir = os.path.join(output_dir, self.name)
-        # 
-        # if not os.path.exists(self.output_dir):
-            # os.makedirs(self.output_dir)
-            
-        # self.input_dir = os.path.join(input_dir, self.name)
-        # if (not os.path.exists(self.input_dir)) or (not os.path.exists(os.path.join(self.input_dir, ".git"))):
-            # GitHandler.clone_repo(input_dir, "https://github.com/FFmpeg/FFmpeg.git")
-
         samples_dir = os.path.join(output_dir, self.name, "fate_suite")
         if not os.path.exists(samples_dir) or not os.listdir(samples_dir):
             self.logger.info("FATE Samples not found. Downloading ...")
@@ -271,19 +224,8 @@ class FfmpegProject(Project):
         env_test = self._prepare_env_for_testing(test_name)
         
         cmd = ["make", test_name, "HARNESS_JOBS=1"]
-        return self._run(cmd, test_name, env_test)
+        return self._run(cmd, test_name, env_test, cwd=Path(self.input_dir))
 
-
-
-    # def build(self, coverage=False, n_proc=-1):
-        # if os.path.exists(os.path.join(self.input_dir, "Makefile")):
-            # self._clean()
-        # if not self._configure(self.input_dir, coverage=coverage):
-            # self.logger.error("Configuration failed, cannot build.")
-            # return False
-        # return self._build(n_proc=n_proc)
-        return MakeHandler.build(self.input_dir)
-        
     def get_test(self) -> list[str]:
         out, _, _ = sh(['make', '-s', 'fate-list'], cwd=Path(self.input_dir))
         return [line.strip().split()[0]
