@@ -19,6 +19,8 @@ class ProjectFactory:
             return FfmpegProject(output_dir, input_dir)
         elif name.lower() == "vim":
             return VimProject(output_dir, input_dir)
+        elif name.lower() == "php-src":
+            return PhpSrcProject(output_dir, input_dir) 
         else:
             raise ValueError(f"Unknown project: {name}")
 
@@ -107,8 +109,76 @@ class Project(ABC):
             return False
         return self._build(n_proc=n_proc)
 
-    def _configure(self, cwd: Path, coverage=False):
+    def _configure(self, cwd: Path, coverage=False) -> bool | None:
         pass
+
+class PhpSrcProject(Project):
+
+    def __init__(self, output_dir, input_dir) -> None:
+        super().__init__()
+        
+        self._init(output_dir, input_dir, "php-src", "https://github.com/php/php-src")
+
+    def run_test(self, test_name: str) -> tuple[bool, Exception | None]:
+        env_test = self._prepare_env_for_testing(test_name)
+        
+        cmd = ["make", "test", f"TESTS={test_name}", "HARNESS_JOBS=1"]
+        return self._run(cmd, test_name, env_test, cwd=Path(self.input_dir))
+        
+    def _configure(self, cwd: Path, coverage=False) -> bool:
+        # PHP requires buildconf to generate the configure script first
+        _, returncode, err = sh(["./buildconf", "--force"], cwd=cwd)
+        if returncode != 0:
+            logging.error("buildconf failed")
+            return False
+
+        # Basic PHP configuration
+        config_args = [
+            "./configure",
+            "--disable-all", # Minimal build for speed
+            "--enable-cli",  # Essential for running tests
+            "--disable-cgi",
+            "--disable-fpm",
+            "--disable-phpdbg",
+            "--without-pear",
+            "--enable-filter", 
+            "--enable-json",
+            "--enable-tokenizer"
+        ]
+
+        env_test = os.environ.copy()
+        env_test["CFLAGS"] = "-O0 -g -w"
+        if coverage:
+            env_test["CFLAGS"] += " --coverage"
+            env_test["LDFLAGS"] = "--coverage"
+
+        _, errorcode, _ = sh(cmd=config_args, cwd=cwd, env=env_test)
+        return errorcode == 0
+
+    def get_test(self,cwd):
+        tests = []
+        # PHP tests are .phpt files found in tests/, Zend/, ext/
+        # We walk the directory to find them.
+        tests = glob(os.path.join(cwd, "**/*.phpt"), recursive=True)
+        tests = [os.path.splitext(os.path.basename(t))[0] for t in tests]
+        #for root, dirs, files in os.walk(cwd):
+        #    for f in files:
+        #        if f.endswith(".phpt"):
+        #            t_name = f[:-5] # remove .phpt
+        #            rel_path = os.path.relpath(os.path.join(root, f), cwd)
+
+        #            # Command to run a single test via make
+        #            # NO_INTERACTION=1 prevents it from asking to send reports to PHP.net
+        #            # TESTS=path points to the specific file
+        #            cmd = f"NO_INTERACTION=1 make test TESTS='{rel_path}'"
+
+        #            tests.append({
+        #                "name": t_name,
+        #                "cmd": cmd,
+        #                "type": "phpt"
+        #            })
+
+        return tests
 
 class OpenSSLProject(Project):
 
@@ -129,7 +199,7 @@ class OpenSSLProject(Project):
             for line in out.splitlines()
             if line.strip() and not line.lstrip().startswith(("make", "Files=", "Tests=", "Result:"))]
     
-    def _configure(self, cwd: Path, coverage=False):
+    def _configure(self, cwd: Path, coverage=False) -> bool:
         config_args = ["./config", "no-asm", "-g", "-O0"] 
         if coverage:
             config_args.append("--coverage")
@@ -172,7 +242,7 @@ class VimProject(Project):
         return test_files
         
     
-    def _configure(self, cwd, coverage=False):
+    def _configure(self, cwd, coverage=False) -> bool:
         # Vim configure
         # --with-features=huge: Enables most features (needed for many tests)
         # --enable-gui=no --without-x: Disables GUI (Critical for Docker)
@@ -232,7 +302,7 @@ class FfmpegProject(Project):
             for line in out.splitlines()
             if line.strip() and not line.lstrip().startswith(("make", "Files=", "Tests=", "Result:", "GEN"))]
     
-    def _configure(self, cwd, coverage=False):
+    def _configure(self, cwd, coverage=False) -> bool:
         config_args = ["./configure", "--disable-asm", "--disable-doc"]
         if coverage:
             config_args.append("--extra-cflags=--coverage")

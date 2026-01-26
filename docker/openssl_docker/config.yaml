@@ -11,6 +11,22 @@ dataset:
   csv_file: cwe_projects.csv
 
 project:
+  - php-src:
+      name: "php-src"
+      repository: "https://github.com/php/php-src.git"
+      build:
+        commands: {}
+        flags: {}
+        compiler: ""
+        
+  - vim:
+      name: "vim"
+      repository: "https://github.com/vim/vim.git"
+      build:
+        commands: {}
+        flags: {}
+        compiler: ""
+
   - ffmpeg:
       name: "FFmpeg"
       repository: "https://github.com/FFmpeg/FFmpeg.git"

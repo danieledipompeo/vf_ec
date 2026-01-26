@@ -237,7 +237,7 @@ def main():
             logger.error(f"Error reading input CSV: {e}")
             sys.exit(1)
 
-        for i, (vuln, fix) in enumerate(pairs[:10]):
+        for i, (vuln, fix) in enumerate(pairs):
             logger.info(f"[{i+1}/{len(pairs)}] Processing Pair: {vuln[:8]} -> {fix[:8]}")
 
             pair_result = process_pair(project, vuln, fix, logger)
