@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 import sys
 
-from common import GitHandler, sh
+from common import GitHandler, EnergyHandler, sh
 # from config import Config
 
 class ProjectFactory:
@@ -33,7 +33,7 @@ class Project(ABC):
 
     GCDA_FOLDER = "coverage-per-test"
 
-    def _init(self, output_dir, input_dir, name, project_repo) -> None:
+    def _init(self, output_dir: str, input_dir: str, name: str, project_repo: str) -> None:
         super().__init__()
         self.logger = logging.getLogger(self.__class__.__name__)
         handler = logging.FileHandler(os.path.join(output_dir, "log",  "log.log"))
@@ -55,10 +55,21 @@ class Project(ABC):
     def get_test(self):
         pass
 
-    @abstractmethod
     def run_test(self, test_name: str) -> tuple[bool, Exception | None]:
+        env_test = self._prepare_env_for_testing(test_name)
+        
+        cmd = self.get_test_cmd(test_name) #= ["make", test_name, "HARNESS_JOBS=1"]
+        return self._run(cmd, test_name, env_test, cwd=Path(self.input_dir))
+
+    @abstractmethod
+    def get_test_cmd(self, test_name: str) -> list[str]:
         pass
 
+    def compute_energy(self, test_name: str):
+        os.makedirs(os.path.join(self.output_dir, "energy_measurements"), exist_ok=True)
+        EnergyHandler.measure_test(test_name, cmd=self.get_test_cmd(test_name),
+                                   output_filename=os.path.join(self.output_dir, "energy_measurements", f"{test_name}_energy"),
+                                   project_dir=self.input_dir)
     def _clean(self):
         sh(cmd=["make", "clean"], cwd=Path(self.input_dir))
 
@@ -119,11 +130,8 @@ class PhpSrcProject(Project):
         
         self._init(output_dir, input_dir, "php-src", "https://github.com/php/php-src")
 
-    def run_test(self, test_name: str) -> tuple[bool, Exception | None]:
-        env_test = self._prepare_env_for_testing(test_name)
-        
-        cmd = ["make", "test", f"TESTS={test_name}", "HARNESS_JOBS=1"]
-        return self._run(cmd, test_name, env_test, cwd=Path(self.input_dir))
+    def get_test_cmd(self, test_name: str) -> list[str]:
+        return ["make", "test", f"TESTS={test_name}", "HARNESS_JOBS=1"]
         
     def _configure(self, cwd: Path, coverage=False) -> bool:
         # PHP requires buildconf to generate the configure script first
@@ -185,13 +193,10 @@ class OpenSSLProject(Project):
     def __init__(self, output_dir, input_dir) -> None:
         super().__init__()
 
-        self._init(output_dir, input_dir, "openssl", "https://github.com/openssl/openssl")
+        self._init(output_dir, input_dir, "openssl", "https://github.com/openssl/openssl") 
 
-    def run_test(self, test_name: str) -> tuple[bool, Exception | None]:
-        env_test = self._prepare_env_for_testing(test_name)
-        
-        cmd = ["make", "test", f"TESTS={test_name}", "HARNESS_JOBS=1"]
-        return self._run(cmd, test_name, env_test, cwd=Path(self.input_dir))
+    def get_test_cmd(self, test_name: str) -> list[str]:
+        return ["make", "test", f"TESTS={test_name}", "HARNESS_JOBS=1"]
         
     def get_test(self) -> list[str]:
         out, _, _ = sh(['make', 'list-tests'], cwd=Path(self.input_dir))
@@ -228,12 +233,8 @@ class VimProject(Project):
         
         self._init(output_dir, input_dir, "vim", "https://github.com/vim/vim")
 
-    def run_test(self, test_name: str) -> tuple[bool, Exception | None]:
-        env_test = self._prepare_env_for_testing(test_name)
-        
-        cmd = ["make", test_name, "HARNESS_JOBS=1"]
-        return self._run(cmd, test_name, env_test, 
-                         cwd=Path(os.path.join(self.input_dir, "src", "testdir")))
+    def get_test_cmd(self, test_name: str) -> list[str]:
+        return ["make", test_name, "HARNESS_JOBS=1"]
 
     def get_test(self) -> list[str]:
         test_files = [Path(f).stem 
@@ -289,12 +290,8 @@ class FfmpegProject(Project):
                 self.logger.error(f"Failed to download FATE samples: {e}")
                 sys.exit(1)
 
-
-    def run_test(self, test_name: str) -> tuple[bool, Exception | None]:
-        env_test = self._prepare_env_for_testing(test_name)
-        
-        cmd = ["make", test_name, "HARNESS_JOBS=1"]
-        return self._run(cmd, test_name, env_test, cwd=Path(self.input_dir))
+    def get_test_cmd(self, test_name: str) -> list[str]:
+        return ["make", test_name, "HARNESS_JOBS=1"]
 
     def get_test(self) -> list[str]:
         out, _, _ = sh(['make', '-s', 'fate-list'], cwd=Path(self.input_dir))

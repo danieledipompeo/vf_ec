@@ -134,7 +134,8 @@ def coverage_energy(project: Project, commit: str, logger: logging.Logger):
     # prepare_for_energy_measurement()
     project.build(coverage=False)
     for test in kept_tests:
-        EnergyHandler.measure_test(rapl_pkg, test, commit, project.output_dir, project_dir=project.input_dir)
+        project.compute_energy(test['name'])
+        # EnergyHandler.measure_test(rapl_pkg, test, commit, project.output_dir, project_dir=project.input_dir)
 
     return process_results
 

@@ -80,6 +80,11 @@ class EnergyHandler:
     handler = logging.FileHandler("energy_handler.log")
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG)
+    
+    ITERATION_TIMEOUT_MS = 5000
+    COOL_DOWN_SEC = 1.0
+    ITERATIONS = 5
+      
 
     @staticmethod
     def detect_rapl(perf_bin="perf"):
@@ -103,7 +108,13 @@ class EnergyHandler:
         return sorted(events)
 
     @staticmethod
-    def measure_test(pkg_event: list, test: dict, commit: str, output_dir: str, project_dir: str, iterations: int = 5, timeout_ms: int = 5000, cool_down_sec: float = 1.0):
+    # def measure_test(#pkg_event: list, 
+    #                  test: dict, commit: str, 
+    #                  output_dir: str, project_dir: str, 
+    #                  iterations: int = 5, timeout_ms: int = 5000, 
+    #                  cool_down_sec: float = 1.0):
+    @staticmethod
+    def measure_test(test: str, cmd: list[str], output_filename: str, project_dir: str):
         """
         Measures energy consumption for a given test command using perf.
         
@@ -125,6 +136,8 @@ class EnergyHandler:
         :type cool_down_sec: float
         """
         import time
+        
+        pkg_event = EnergyHandler.detect_rapl() 
 
         # Accept a list from detect_rapl() or a single event string.
         if isinstance(pkg_event, (list, tuple, set)):
@@ -139,20 +152,20 @@ class EnergyHandler:
 
         perf_events = ",".join(events + ["cycles", "instructions"])
         
-        pb = ProgressBar(iterations)
-        output_dir = os.path.join(output_dir, "energy_measurements") 
-        os.makedirs(output_dir, exist_ok=True)
+        pb = ProgressBar(EnergyHandler.ITERATIONS)
+        # output_dir = os.path.join(output_, "energy_measurements") 
+        # os.makedirs(output_dir, exist_ok=True)
 
-        timeout_ms = test.get("timeout_ms", timeout_ms)  # e.g. 5s default, tune per test
-        EnergyHandler.logger.info(f"Measuring energy for test '{test.get('name')}': "
-              f"{iterations} iterations × {timeout_ms}ms timeout each")
+        timeout_ms = EnergyHandler.ITERATION_TIMEOUT_MS  # e.g. 5s default, tune per test
+        EnergyHandler.logger.info(f"Measuring energy for test '{test}': "
+              f"{EnergyHandler.ITERATIONS} iterations × {timeout_ms}ms timeout each")
 
-        for iteration in range(iterations):
+        for iteration in range(EnergyHandler.ITERATIONS):
             pb.set(iteration)
 
-            perf_out = os.path.join(output_dir, f"{commit}_{test.get('name')}__{iteration}.csv")
-            # TODO : handle cmd through MakeHandler
-            cmd = ["make", "test", f"TESTS={test.get('name')}", "HARNESS_JOBS=1"]
+            output_filename += f"__{iteration}.csv"
+
+            # cmd = ["make", "test", f"TESTS={test.get('name')}", "HARNESS_JOBS=1"]
             wrapped_cmd = EnergyHandler._wrap_until_timeout(cmd, timeout_ms)
 
             # Build perf as argv list (safer than huge shell string)
@@ -160,7 +173,7 @@ class EnergyHandler:
                 "perf", "stat",
                 "-a",
                 "-e", f"{perf_events}",
-                "-x,", "--output", perf_out,
+                "-x,", "--output", output_filename,
                 "--",
             ]
             # wrapped_cmd already includes "bash -lc '<script>'" so we run via sh -c? Not needed.
@@ -176,18 +189,18 @@ class EnergyHandler:
             
             if res.returncode != 0: 
                 EnergyHandler.logger.error(
-                    f"\n[ERROR] Test '{test.get('name')}' failed during energy measurement.\n"
+                    f"[ERROR] Test '{test}' failed during energy measurement.\n"
                     f"Return code: {res.returncode}\n"
                     f"Command: {wrapped_cmd}\n"
                     f"STDERR: {res.stderr.strip()}\n"
                     f"STDOUT: {res.stdout.strip()}"
                 )
-                if os.path.exists(perf_out):
-                    EnergyHandler.logger.warning(f"Removing perf output file due to error: {perf_out}")
-                    os.remove(perf_out)
+                if os.path.exists(output_filename):
+                    EnergyHandler.logger.warning(f"Removing perf output file due to error: {output_filename}")
+                    os.remove(output_filename)
                     
-            EnergyHandler.logger.info(f"[COOL DOWN] {cool_down_sec} seconds...")
-            time.sleep(cool_down_sec)
+            EnergyHandler.logger.info(f"[COOL DOWN] {EnergyHandler.COOL_DOWN_SEC} seconds...")
+            time.sleep(EnergyHandler.COOL_DOWN_SEC)
 
     @staticmethod
     def _wrap_until_timeout(test_cmd: list[str], timeout_ms: int) -> str:
