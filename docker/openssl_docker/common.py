@@ -43,9 +43,9 @@ def get_covered_files(cwd):
     return list(covered)
 
 def sh(cmd: list[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> tuple[str, int, str]:
-    print("+", " ".join(cmd), flush=True)
-    out = subprocess.run(cmd, cwd=str(cwd) if cwd else None, env=env,
-                         text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    print("+",str(cwd) + "/" if cwd else "./", " ".join(cmd), flush=True)
+    out = subprocess.run(" ".join(cmd), cwd=str(cwd) if cwd else None, env=env,
+                         text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     return out.stdout, out.returncode, out.stderr
 
 
@@ -67,12 +67,20 @@ class GitHandler:
         return sh(["git", "checkout", "-f" if force else "", commit_hash], cwd)
     
     @staticmethod
-    def clone_repo(cwd, repo_url):
-        cmd = ['git', 'clone', repo_url]
+    def clone_repo(cwd, repo_url, dest_path=""):
+        cmd = ['git', 'clone', repo_url, dest_path]
         if not os.path.exists(os.path.join(cwd, os.path.basename(repo_url).replace('.git',''))):
             sh(cmd, cwd)
-
     
+    @staticmethod
+    def get_age_of_commit(cwd, commit_hash):
+        from datetime import datetime
+        cmd = ["git", "show", "-s", "--format=%ct", commit_hash]
+        out, code, err = sh(cmd, cwd)
+        if code == 0:
+            timestamp = int(out.strip())
+            return datetime.fromtimestamp(timestamp).year
+        return None
 
 class EnergyHandler:
 
@@ -107,7 +115,7 @@ class EnergyHandler:
         EnergyHandler.logger.info(f"Detected RAPL energy events: {sorted(events)}")
         return sorted(events)
 
-    @staticmethod
+    # @staticmethod
     # def measure_test(#pkg_event: list, 
     #                  test: dict, commit: str, 
     #                  output_dir: str, project_dir: str, 
@@ -163,7 +171,7 @@ class EnergyHandler:
         for iteration in range(EnergyHandler.ITERATIONS):
             pb.set(iteration)
 
-            output_filename += f"__{iteration}.csv"
+            energy_file = output_filename + f"__{iteration}.csv"
 
             # cmd = ["make", "test", f"TESTS={test.get('name')}", "HARNESS_JOBS=1"]
             wrapped_cmd = EnergyHandler._wrap_until_timeout(cmd, timeout_ms)
@@ -173,7 +181,7 @@ class EnergyHandler:
                 "perf", "stat",
                 "-a",
                 "-e", f"{perf_events}",
-                "-x,", "--output", output_filename,
+                "-x,", "--output", energy_file,
                 "--",
             ]
             # wrapped_cmd already includes "bash -lc '<script>'" so we run via sh -c? Not needed.
@@ -195,9 +203,9 @@ class EnergyHandler:
                     f"STDERR: {res.stderr.strip()}\n"
                     f"STDOUT: {res.stdout.strip()}"
                 )
-                if os.path.exists(output_filename):
-                    EnergyHandler.logger.warning(f"Removing perf output file due to error: {output_filename}")
-                    os.remove(output_filename)
+                if os.path.exists(energy_file):
+                    EnergyHandler.logger.warning(f"Removing perf output file due to error: {energy_file}")
+                    os.remove(energy_file)
                     
             EnergyHandler.logger.info(f"[COOL DOWN] {EnergyHandler.COOL_DOWN_SEC} seconds...")
             time.sleep(EnergyHandler.COOL_DOWN_SEC)
@@ -230,4 +238,3 @@ class EnergyHandler:
             )
         )
         return wrapped
-    

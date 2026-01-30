@@ -7,33 +7,10 @@ paths:
   gcda_dir: /app/output/gcda_files
 
 dataset:
-  csv_url: "https://gist.githubusercontent.com/waheed-sep/935cfc1ba42b2475d45336a4c779cbc8/raw/ea91568360d87979373a7eca38f289c9bf30d103/cwe_projects.csv"
-  csv_file: cwe_projects.csv
+  csv_url: "https://gist.githubusercontent.com/waheed-sep/935cfc1ba42b2475d45336a4c779cbc8"
+  csv_file: cwe_projects
 
 project:
-  - php-src:
-      name: "php-src"
-      repository: "https://github.com/php/php-src.git"
-      build:
-        commands: {}
-        flags: {}
-        compiler: ""
-        
-  - vim:
-      name: "vim"
-      repository: "https://github.com/vim/vim.git"
-      build:
-        commands: {}
-        flags: {}
-        compiler: ""
-
-  - ffmpeg:
-      name: "FFmpeg"
-      repository: "https://github.com/FFmpeg/FFmpeg.git"
-      build:
-        commands: {}
-        flags: {}
-        compiler: ""
 
   - openssl:
       name: "openssl"
@@ -53,6 +30,40 @@ project:
           coverage_cflags: "--coverage"
           coverage_lflags: "--coverage"
         compiler: "gcc"
+
+  - libvncserver:
+      name: "libvncserver"
+      repository: "https://github.com/LibVNC/libvncserver.git"
+      build:
+        commands: {}
+        flags: {}
+        compiler: ""
+        
+  ## Needs additional configuration to build
+  - php-src:
+      name: "php-src"
+      repository: "https://github.com/php/php-src.git"
+      build:
+        commands: {}
+        flags: {}
+        compiler: ""
+
+  - vim:
+      name: "vim"
+      repository: "https://github.com/vim/vim.git"
+      build:
+        commands: {}
+        flags: {}
+        compiler: ""
+
+  - ffmpeg:
+      name: "FFmpeg"
+      repository: "https://github.com/FFmpeg/FFmpeg.git"
+      build:
+        commands: {}
+        flags: {}
+        compiler: ""
+
   
 test:
   strategies:

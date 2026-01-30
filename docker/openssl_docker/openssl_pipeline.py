@@ -3,7 +3,6 @@ import csv
 import logging
 import json
 import sys
-import pandas as pd
 from pathlib import Path
 import yaml
 
@@ -71,6 +70,7 @@ def process_commit(project : Project, commit: str, coverage: bool = True) -> lis
     print(f"\nRunning {len(suite)} tests...")
 
     pb = ProgressBar(len(suite), step=10)
+    print(f"-- TEST SUITE LIMITED TO FIRST 5 TESTS OUT OF {len(suite)} TOTAL TESTS FOR DEMO PURPOSES.")
     for i, t in enumerate(suite[:5]):
         pb.set(i)
 
@@ -107,8 +107,10 @@ def coverage_energy(project: Project, commit: str, logger: logging.Logger):
     
     GitHandler.clean_repo(project.input_dir)
     if not GitHandler.checkout(project.input_dir, commit):
-        logging.error(f"Failed to checkout commit: {commit}")
+        logger.error(f"Failed to checkout commit: {commit}")
         return None
+    
+    print(f"-- Processing commit age: {GitHandler.get_age_of_commit(project.input_dir, commit)}")
     
     git_changed_files= GitHandler.get_git_diff_files(project.input_dir, commit)
     
@@ -127,20 +129,20 @@ def coverage_energy(project: Project, commit: str, logger: logging.Logger):
     logger.info(f"Now computing energy for {commit[:8]}.")
     
     # extract RAPL package events
-    rapl_pkg = EnergyHandler.detect_rapl()
+    # rapl_pkg = EnergyHandler.detect_rapl()
 
     kept_tests = [t for t in process_results.get('tests', []) if t.get('keep', True) and t.get('passed', False)]
 
     # prepare_for_energy_measurement()
     project.build(coverage=False)
     for test in kept_tests:
-        project.compute_energy(test['name'])
+        project.compute_energy(f"{commit}__{test['name']}")
         # EnergyHandler.measure_test(rapl_pkg, test, commit, project.output_dir, project_dir=project.input_dir)
 
     return process_results
 
 
-def process_pair(project: Project, vuln: str, fix: str, logger: logging.Logger):
+def process_pair(project: Project, vuln: str, fix: str, logger: logging.Logger) -> dict | None:
     """
     Run coverage+energy for a vuln/fix pair and collate results.
     """
@@ -188,11 +190,28 @@ def download_dataset(config: dict):
     if not os.path.exists(dest_dir):
         os.makedirs(dest_dir, exist_ok=True)
     
-    if not os.path.isfile(dest_path):
-        logging.info(f"Downloading dataset from {url} to {dest_path}...")
-        sh(['wget', '-O', dest_path, url], Path(dest_dir))
-    else:
-        logging.info(f"Dataset already exists at {dest_path}. Skipping download.")
+    #if not os.path.isfile(dest_path):
+    #    logging.info(f"Downloading dataset from {url} to {dest_path}...")
+    #    sh(['wget', '-O', dest_path, url], Path(dest_dir))
+    #else:
+    #    logging.info(f"Dataset already exists at {dest_path}. Skipping download.")
+    
+    GitHandler.clone_repo(dest_dir, url, dest_path)
+
+def parse_csv(configuration: dict) -> list[dict]:
+    
+    cwe_csv_path = os.path.join(configuration.get('paths', {}).get('input_dir', ""), 
+                                configuration.get('dataset', {}).get('csv_file', ""), 
+                                "cwe_projects.csv")
+    if not os.path.isfile(cwe_csv_path):
+        download_dataset(configuration)
+        
+    data = []
+    with open(cwe_csv_path, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            data.append(row)
+    return data
 
 def main():
     # configuration = Config(os.path.join(os.path.dirname(__file__), "config.yaml"))
@@ -203,9 +222,14 @@ def main():
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG)
 
-    input_csv = os.path.join(configuration.get('paths', {}).get('input_dir', ""), configuration.get('dataset', {}).get('csv_file', ""))
-    if input_csv and not os.path.exists(input_csv):
-        download_dataset(configuration)
+    # input_csv = os.path.join(configuration.get('paths', {}).get('input_dir', ""), configuration.get('dataset', {}).get('csv_file', ""))
+    # if input_csv and not os.path.exists(input_csv):
+    # download_dataset(configuration)
+    
+    # cwe_csv_path = os.path.join(configuration.get('paths', {}).get('input_dir', ""), 
+    #                             configuration.get('dataset', {}).get('csv_file', ""), 
+    #                             "cwe_projects.csv")
+    cwe_csv = parse_csv(configuration)
     
     for prj in configuration.get("project", []):
         # Extract project name and config from dict structure
@@ -219,24 +243,8 @@ def main():
         
         logger.info(f"Starting processing: {project.name}")
 
-        pairs = []
-        try:
-            # dataset_config = configuration.get('dataset')
-            # if not dataset_config:
-            #     logging.error("'dataset' configuration not found")
-            #     sys.exit(1)
-            # input_csv = dataset_config.get('csv_file')
-            # if not input_csv:
-            #     logger.warning("'input_csv' path not found in dataset configuration")
-            #     sys.exit(1)
-            with open(input_csv, 'r') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if row.get('project') == project_config.get('name') and 'vuln_commit' in row and 'fix_commit' in row:
-                        pairs.append((row['vuln_commit'], row['fix_commit']))
-        except Exception as e:
-            logger.error(f"Error reading input CSV: {e}")
-            sys.exit(1)
+        pairs = [ (row['vuln_commit'], row['fix_commit']) for row in cwe_csv 
+                  if row.get('project') == project_config.get('name') ]
 
         for i, (vuln, fix) in enumerate(pairs):
             logger.info(f"[{i+1}/{len(pairs)}] Processing Pair: {vuln[:8]} -> {fix[:8]}")

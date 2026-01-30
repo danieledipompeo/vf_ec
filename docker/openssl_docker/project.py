@@ -21,6 +21,11 @@ class ProjectFactory:
             return VimProject(output_dir, input_dir)
         elif name.lower() == "php-src":
             return PhpSrcProject(output_dir, input_dir) 
+        elif name.lower() == 'libraw':
+            return LibRawProject(output_dir, input_dir)
+        elif name.lower() == "libvncserver":
+            return LibVNCServerProject(output_dir, input_dir)
+
         else:
             raise ValueError(f"Unknown project: {name}")
 
@@ -48,7 +53,7 @@ class Project(ABC):
         
         self.input_dir = os.path.join(input_dir, self.name)
 
-        if (not os.path.exists(self.input_dir)) or (not os.path.exists(os.path.join(self.input_dir, ".git"))):
+        if not os.path.exists(os.path.join(self.input_dir, ".git")):
             GitHandler.clone_repo(input_dir, project_repo)
         
     @abstractmethod
@@ -57,7 +62,6 @@ class Project(ABC):
 
     def run_test(self, test_name: str) -> tuple[bool, Exception | None]:
         env_test = self._prepare_env_for_testing(test_name)
-        
         cmd = self.get_test_cmd(test_name) #= ["make", test_name, "HARNESS_JOBS=1"]
         return self._run(cmd, test_name, env_test, cwd=Path(self.input_dir))
 
@@ -66,10 +70,11 @@ class Project(ABC):
         pass
 
     def compute_energy(self, test_name: str):
-        os.makedirs(os.path.join(self.output_dir, "energy_measurements"), exist_ok=True)
-        EnergyHandler.measure_test(test_name, cmd=self.get_test_cmd(test_name),
-                                   output_filename=os.path.join(self.output_dir, "energy_measurements", f"{test_name}_energy"),
-                                   project_dir=self.input_dir)
+        print("COMPUTE ENERGY DISABLED FOR TESTING")
+        # os.makedirs(os.path.join(self.output_dir, "energy_measurements"), exist_ok=True)
+        # EnergyHandler.measure_test(test_name, cmd=self.get_test_cmd(test_name),
+                                #    output_filename=os.path.join(self.output_dir, "energy_measurements", f"{test_name}_energy"),
+                                #    project_dir=self.input_dir)
     def _clean(self):
         sh(cmd=["make", "clean"], cwd=Path(self.input_dir))
 
@@ -93,19 +98,26 @@ class Project(ABC):
         :param test_name: The name of the test for which coverage files are retrieved.
         :return: A list of relative coverage file paths.
         """
-        gcdas = sorted((Path(self.output_dir) / Project.GCDA_FOLDER / test_name).glob("**/*.gcda"))
-        return [str(gcda.relative_to(Path(self.output_dir) / Project.GCDA_FOLDER / test_name)).replace("gcda", "c") for gcda in gcdas]
+        gcda_path = Path(self.output_dir) / Project.GCDA_FOLDER / test_name
+        gcdas = [f.split(".dir/")[-1] for f in glob(str(gcda_path / "**/*.gcda"), recursive=True) if ".dir/" in f]
+        #gcdas = sorted((Path(self.output_dir) / Project.GCDA_FOLDER / test_name).glob("**/*.gcda"))
+        gcdas = [g.replace('.c.gcda', '.c') for g in gcdas]
+        gcdas = [g.replace('.gcda', '.c') for g in gcdas]
+        return gcdas
 
     def _prepare_env_for_testing(self, test_name: str) -> dict:
         output_dir = os.path.join(self.output_dir, Project.GCDA_FOLDER)
         sh(["mkdir", "-p", output_dir])
-        env_test = os.environ.copy()
+        # env_test = os.environ.copy()
+        env_test = {}
         env_test["GCOV_PREFIX_STRIP"] = "3"
         env_test["GCOV_PREFIX"] = os.path.join(output_dir, test_name)
         return env_test
 
     def _run(self, cmd: list[str], test_name: str, env_test: dict, cwd: Path) -> tuple[bool, Exception | None]:
         try:
+            cmd_tmp = [f'{k}={v}' for k, v in env_test.items()]
+            cmd = cmd_tmp + cmd
             _, errorcode, _ = sh(cmd, cwd=cwd, env=env_test)
             return errorcode == 0, None
         except Exception as e:
@@ -122,6 +134,96 @@ class Project(ABC):
 
     def _configure(self, cwd: Path, coverage=False) -> bool | None:
         pass
+
+class LibVNCServerProject(Project):
+
+    def __init__(self, output_dir, input_dir) -> None:
+        super().__init__()
+        
+        self._init(output_dir, input_dir, "libvncserver", "https://github.com/LibVNC/libvncserver")
+        
+        sh(["git", "submodule", "update", "--init", "--recursive"], cwd=Path(self.input_dir))
+    
+    def get_test_cmd(self, test_name: str) -> list[str]:
+        return ["ctest", "-R", f"^{test_name}$", "--output-on-failure"]
+    
+    def _run(self, cmd: list[str], test_name: str, env_test: dict, cwd: Path) -> tuple[bool, Exception | None]:
+        try:
+            cmd_tmp = [f'{k}={v}' for k, v in env_test.items()]
+            cmd = cmd_tmp + cmd
+            _, errorcode, _ = sh(cmd, cwd=cwd / 'cmake_build', env=env_test)
+            return errorcode == 0, None
+        except Exception as e:
+            # self.logger.error(f"Test '{test_name}' failed with exception: {e}")
+            return False, e
+        
+    def get_test(self) -> list[str]:
+        tests = []
+
+        # CMake logic
+        build_dir = os.path.join(self.input_dir, "cmake_build")
+        if os.path.exists(build_dir):
+            stdout, returncode, stderr = sh(["ctest", "-N"], cwd=Path(build_dir))
+            for line in stdout.splitlines():
+                if "Test #" in line:
+                    parts = line.split(":")
+                    if len(parts) >= 2:
+                        tests.append(parts[1].strip())
+        # Autotools logic
+        else:
+            # TODO fix during the debugging session
+            pass
+        return tests
+    
+    def _build(self, n_proc=-1):
+        import os
+        if os.path.exists(os.path.join(self.input_dir, "cmake_build")):
+            cmd = ["cmake", "--build", "cmake_build"]
+        else:
+            cmd = ["make"]
+            
+        if n_proc == -1:
+            import os
+            nproc = os.cpu_count() or 1
+            cmd.append(f"-j{nproc}")
+        else:
+            cmd.append(f"-j{n_proc}")
+        
+        _, errorcode, _ = sh(cmd=cmd, cwd=Path(self.input_dir))
+        return errorcode == 0
+        
+        
+    def _configure(self, cwd: Path, coverage=False) -> bool:
+        flags = "-O0"
+        libs = ""
+        
+        if coverage:
+            flags += " --coverage"
+            libs = "-lgcov" 
+        
+        # [NEW] Hybrid build logic. LibVNCServer switched from Autotools to CMake over time.
+        if os.path.exists(os.path.join(cwd, "CMakeLists.txt")):
+            logging.info("Detected CMake build system.")
+            cmake_cmd = [
+                'cmake', '-B', 'cmake_build', '-S', '.',
+                f'-DCMAKE_C_FLAGS="{flags}"',
+                f'-DCMAKE_EXE_LINKER_FLAGS="{libs}"',
+                '-DBUILD_TESTS=ON'
+            ]
+            stdout, returncode, stderr = sh(cmake_cmd, cwd=Path(cwd))
+        else:
+            logging.info("Detected Legacy Autotools build system.")
+            if not os.path.exists(os.path.join(cwd, "configure")):
+                sh(["autogen.sh"], cwd=Path(cwd))
+            
+            env_test = os.environ.copy()
+            env_test["CFLAGS"] = flags
+            env_test["LDFLAGS"] = flags
+            env_test["LIBS"] = libs
+                        
+            full_cmd = ['./configure', '--enable-static']
+            _, returncode, _ = sh(full_cmd, cwd=Path(cwd), env=env_test)
+        return returncode == 0
 
 class PhpSrcProject(Project):
 
@@ -141,26 +243,34 @@ class PhpSrcProject(Project):
             return False
 
         # Basic PHP configuration
+        #config_args = [
+        #    "./configure",
+        #    "--disable-all", # Minimal build for speed
+        #    "--enable-cli",  # Essential for running tests
+        #    "--disable-cgi",
+        #    "--disable-fpm",
+        #    "--disable-phpdbg",
+        #    "--without-pear",
+        #    "--enable-filter", 
+        #    "--enable-json",
+        #    "--enable-tokenizer"
+        #]
+
         config_args = [
             "./configure",
-            "--disable-all", # Minimal build for speed
-            "--enable-cli",  # Essential for running tests
-            "--disable-cgi",
-            "--disable-fpm",
-            "--disable-phpdbg",
-            "--without-pear",
-            "--enable-filter", 
-            "--enable-json",
-            "--enable-tokenizer"
+            "--prefix=/usr/local/php", 
+            "--enable-cli",
+            "CFLAGS=-fprofile-arcs -ftest-coverage",
+            "CXXFLAGS=-fprofile-arcs -ftest-coverage"
         ]
 
-        env_test = os.environ.copy()
-        env_test["CFLAGS"] = "-O0 -g -w"
-        if coverage:
-            env_test["CFLAGS"] += " --coverage"
-            env_test["LDFLAGS"] = "--coverage"
+        # env_test = os.environ.copy()
+        # env_test["CFLAGS"] = "-O0 -g -w"
+        # if coverage:
+        #     env_test["CFLAGS"] += " --coverage"
+        #     env_test["LDFLAGS"] = "--coverage"
 
-        _, errorcode, _ = sh(cmd=config_args, cwd=cwd, env=env_test)
+        _, errorcode, _ = sh(cmd=config_args, cwd=cwd)
         return errorcode == 0
 
     def get_test(self,cwd):
@@ -204,25 +314,30 @@ class OpenSSLProject(Project):
             for line in out.splitlines()
             if line.strip() and not line.lstrip().startswith(("make", "Files=", "Tests=", "Result:"))]
     
+    def _get_configure_cmd(self, coverage=True) -> str:
+        return "./config no-asm -g -O0 --coverage"
+        
+    
     def _configure(self, cwd: Path, coverage=False) -> bool:
-        config_args = ["./config", "no-asm", "-g", "-O0"] 
+        config_args = ["./config", "--debug", "no-shared"]
+        # config_args = ["./config", "no-asm", "-g", "-O0"] 
         if coverage:
             config_args.append("--coverage")
         
         _, errorcode, err = sh(config_args, cwd=cwd)
-        if errorcode != 0:
-            self.logger.warning(f"Trying fallback configuration due to exception: {err}")
-            env_backup = os.environ.copy()
-            env_backup['CFLAGS']="-O0 -g -fprofile-arcs -ftest-coverage"
-            env_backup["LDFLAGS"]="--coverage"
-            config_args = ["./Configure", "linux-x86_64", "no-asm"]
-            _, errorcode, err = sh(config_args, cwd=cwd, env=env_backup)
-            if errorcode !=0:
-                self.logger.error(f"Fallback configuration also failed due to exception: {err}")
-                return False
+        #if errorcode != 0:
+        #    self.logger.warning(f"Trying fallback configuration due to exception: {err}")
+        #    env_backup = os.environ.copy()
+        #    env_backup['CFLAGS']="-O0 -g -fprofile-arcs -ftest-coverage"
+        #    env_backup["LDFLAGS"]="--coverage"
+        #    config_args = ["./Configure", "linux-x86_64", "no-asm"]
+        #    _, errorcode, err = sh(config_args, cwd=cwd, env=env_backup)
+        #    if errorcode !=0:
+        #        self.logger.error(f"Fallback configuration also failed due to exception: {err}")
+        #        return False
         
-        self.logger.info("Configuration succeeded with standard ./config.")
-        return True
+        self.logger.info(f"Configuration succeeded: {errorcode == 0}.")
+        return errorcode == 0
     
 class VimProject(Project):
 
@@ -311,3 +426,18 @@ class FfmpegProject(Project):
         
         self.logger.info("Configuration succeeded with standard ./config.")
         return True
+    
+class LibRawProject(Project):
+    
+    raw_sample: str
+    def __init__(self, output_dir, input_dir):            
+        super().__init__()
+        
+        self._init(output_dir, input_dir, "libraw","https://github.com/LibRaw/LibRaw.git")
+        self.raw_sample = os.path.join(self.input_dir, "sample.cr2")
+
+    def get_test_cmd(self, test_name: str) -> list[str]:
+        return ["make", test_name, "HARNESS_JOBS=1"]
+    
+    def get_test(self):
+        return sh(['raw-identify', self.raw_sample], cwd=Path('./bin'))
