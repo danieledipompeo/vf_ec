@@ -135,6 +135,58 @@ class Project(ABC):
     def _configure(self, cwd: Path, coverage=False) -> bool | None:
         pass
 
+class LibarchiveProject(Project):
+    
+    def __init__(self, output_dir, input_dir) -> None:
+        super().__init__()
+        
+        self._init(output_dir, input_dir, "libarchive", "https://github.com/libarchive/libarchive")  
+
+    def get_test_cmd(self, test_name: str) -> list[str]:
+        return ["cmake", "--build", "cmake_build", "-R", test_name, "--output-on-failure"]
+    
+    def get_test(self) -> list[str]:
+        stdout, code, stderr = sh(["cmake", "-N"], cwd=Path(self.input_dir) / "cmake_build")
+        
+        if code != 0:
+            self.logger.error(f"Failed to get test list: {stderr}")
+            return []
+        
+        tests = [str(line).split(":")[1] for line in stdout.splitlines() if "Test #" in line]
+        return tests
+
+    def _configure(self, cwd: Path, coverage=False) -> bool:
+        cmd = ["cmake", "-B", "cmake_build", "-S", ".",
+               "-DCMAKE_BUILD_TYPE=Debug",
+               "-DENABLE_COVERAGE=OFF",
+               "-DENABLE_TEST=ON"]
+
+        cmd .append("-DCMAKE_C_FLAGS=-g -O0 -Wno-error=unused-variable" + (" --coverage" if coverage else ""))
+        if coverage:
+            cmd.append("-DCMAKE_EXE_LINKER_FLAGS=--coverage")
+
+        _, errorcode, _ = sh(cmd, cwd=cwd)
+        return errorcode == 0
+    
+    def _build(self, n_proc=-1):
+        import os
+        if os.path.exists(os.path.join(self.input_dir, "cmake_build")):
+            cmd = ["cmake", "--build", "cmake_build"]
+        else:
+            cmd = ["make"]
+            
+        if n_proc == -1:
+            import os
+            nproc = os.cpu_count() or 1
+            cmd.append(f"-j{nproc}")
+        else:
+            cmd.append(f"-j{n_proc}")
+        
+        _, errorcode, _ = sh(cmd=cmd, cwd=Path(self.input_dir))
+        return errorcode == 0
+        
+    
+
 class LibVNCServerProject(Project):
 
     def __init__(self, output_dir, input_dir) -> None:
