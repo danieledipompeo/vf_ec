@@ -70,8 +70,8 @@ def process_commit(project : Project, commit: str, coverage: bool = True) -> lis
     print(f"\nRunning {len(suite)} tests...")
 
     pb = ProgressBar(len(suite), step=10)
-    print(f"-- TEST SUITE LIMITED TO FIRST 5 TESTS OUT OF {len(suite)} TOTAL TESTS FOR DEMO PURPOSES.")
-    for i, t in enumerate(suite[:5]):
+    # print(f"-- TEST SUITE LIMITED TO FIRST 5 TESTS OUT OF {len(suite)} TOTAL TESTS FOR DEMO PURPOSES.")
+    for i, t in enumerate(suite):
         pb.set(i)
 
         test = {
