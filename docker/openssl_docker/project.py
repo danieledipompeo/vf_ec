@@ -1,6 +1,7 @@
 # create an abstract class for projects
 from abc import ABC, abstractmethod
 from glob import glob
+import glob as glob_module
 import os
 import logging
 from pathlib import Path
@@ -108,17 +109,16 @@ class Project(ABC):
     def _prepare_env_for_testing(self, test_name: str) -> dict:
         output_dir = os.path.join(self.output_dir, Project.GCDA_FOLDER)
         sh(["mkdir", "-p", output_dir])
-        # env_test = os.environ.copy()
-        env_test = {}
+        env_test = os.environ.copy()
         env_test["GCOV_PREFIX_STRIP"] = "3"
         env_test["GCOV_PREFIX"] = os.path.join(output_dir, test_name)
         return env_test
 
     def _run(self, cmd: list[str], test_name: str, env_test: dict, cwd: Path) -> tuple[bool, Exception | None]:
         try:
-            cmd_tmp = [f'{k}={v}' for k, v in env_test.items()]
-            cmd = cmd_tmp + cmd
-            _, errorcode, _ = sh(cmd, cwd=cwd, env=env_test)
+            stdout, errorcode, stderr = sh(cmd, cwd=cwd, env=env_test)
+            if errorcode != 0:
+                print(f"Test output:\n{stdout}\n{stderr}")
             return errorcode == 0, None
         except Exception as e:
             # self.logger.error(f"Test '{test_name}' failed with exception: {e}")
@@ -149,8 +149,6 @@ class LibVNCServerProject(Project):
     
     def _run(self, cmd: list[str], test_name: str, env_test: dict, cwd: Path) -> tuple[bool, Exception | None]:
         try:
-            cmd_tmp = [f'{k}={v}' for k, v in env_test.items()]
-            cmd = cmd_tmp + cmd
             _, errorcode, _ = sh(cmd, cwd=cwd / 'cmake_build', env=env_test)
             return errorcode == 0, None
         except Exception as e:
@@ -348,15 +346,50 @@ class VimProject(Project):
         
         self._init(output_dir, input_dir, "vim", "https://github.com/vim/vim")
 
+    def _prepare_env_for_testing(self, test_name: str) -> dict:
+        output_dir = os.path.join(self.output_dir, Project.GCDA_FOLDER)
+        sh(["mkdir", "-p", output_dir])
+        env_test = os.environ.copy()
+        env_test["GCOV_PREFIX_STRIP"] = "3"
+        env_test["GCOV_PREFIX"] = os.path.join(output_dir, test_name)
+        env_test["LINES"] = "24"
+        env_test["COLUMNS"] = "80"
+        return env_test
+
     def get_test_cmd(self, test_name: str) -> list[str]:
-        return ["make", test_name, "HARNESS_JOBS=1"]
+        return ["make", test_name, "HARNESS_JOBS=1", "LINES=24", "COLUMNS=80"]
 
     def get_test(self) -> list[str]:
-        test_files = [Path(f).stem 
-                      for f in glob.glob(f"inputs/vim/{VimProject.TEST_DIR}/test_*.vim") + 
-                               glob.glob(f"inputs/vim/{VimProject.TEST_DIR}/test_*.in")]
-        return test_files
+        test_dir = Path(self.input_dir) / VimProject.TEST_DIR
+
+        test_names = glob(f"{test_dir}/test_*.vim") 
+        test_names += glob(f"{test_dir}/test_*.in")
+
+        test_names = [t.replace(f"{test_dir}/", "") for t in test_names]
+        test_names = [t.replace(".in", "") for t in test_names]
+        test_names = [t.replace(".vim", "") for t in test_names]
+        return test_names
         
+    def run_test(self, test_name: str) -> tuple[bool, Exception | None]:
+        env_test = self._prepare_env_for_testing(test_name)
+        cmd = self.get_test_cmd(test_name)
+        # Wrap the command with script to create a pseudo-terminal with proper size
+        # script -q -e -c "command" /dev/null creates a PTY that vim can query
+        # set rows and cols to 24x80 to avoid test failures due to terminal size
+        cmd_str = '"stty rows 24 cols 80;'
+        cmd_str += " ".join(cmd)
+        cmd_str += '"'
+        wrapped_cmd = ["script", "-q", "-e", "-c", f"{cmd_str}", "/dev/null"]
+        return self._run(wrapped_cmd, test_name, env_test, cwd=Path(self.input_dir) / "src")
+    
+    def _run(self, cmd: list[str], test_name: str, env_test: dict, cwd: Path) -> tuple[bool, Exception | None]:
+        try:
+            stdout, errorcode, stderr = sh(cmd, cwd=cwd, env=env_test)
+            if errorcode != 0:
+                print(f"Test output:\n{stdout}\n{stderr}")
+            return errorcode == 0, None
+        except Exception as e:
+            return False, e
     
     def _configure(self, cwd, coverage=False) -> bool:
         # Vim configure
@@ -369,20 +402,34 @@ class VimProject(Project):
             "--without-x"
         ]
         
-        env_test = os.environ.copy()
-        env_test["CFLAGS"] = "-O0 "
-        if coverage:
-            env_test["CFLAGS"] += "--coverage "
-            # Often helpful to link coverage too
-            env_test["LDFLAGS"] = "--coverage "
+        # env_test = os.environ.copy()
+        # env_test["CFLAGS"] = "-O0 "
+        # if coverage:
+        #     env_test["CFLAGS"] += "--coverage "
+        #     # Often helpful to link coverage too
+        #     env_test["LDFLAGS"] = "--coverage "
 
-        _, errorcode, err = sh(config_args, cwd=cwd, env=env_test)
+        _, errorcode, err = sh(config_args, cwd=cwd)
         if errorcode != 0:
             self.logger.error(f"Configuration failed with error: {err}")
             return False
         
         self.logger.info("Configuration succeeded with standard ./config.")
         return True
+    
+    def _build(self, n_proc=1):
+        cmd = ["make"]
+        cmd_args = ['PROFILE_CFLAGS="-g -O0 -fprofile-arcs -ftest-coverage -DWE_ARE_PROFILING -DUSE_GCOV_FLUSH"', 'LDFLAGS="--coverage"']
+        cmd += cmd_args
+        if n_proc == -1:
+            import os
+            nproc = os.cpu_count() or 1
+            cmd.append(f"-j{nproc}")
+        else:
+            cmd.append(f"-j{n_proc}")
+        
+        _, errorcode, _ = sh(cmd=cmd, cwd=Path(self.input_dir))
+        return errorcode == 0
     
 class FfmpegProject(Project):
 

@@ -2,6 +2,8 @@ import os
 import logging
 import subprocess
 import re
+import pty
+import sys
 from pathlib import Path
 
 class ProgressBar:
@@ -45,8 +47,9 @@ def get_covered_files(cwd):
 def sh(cmd: list[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> tuple[str, int, str]:
     print("+",str(cwd) + "/" if cwd else "./", " ".join(cmd), flush=True)
     out = subprocess.run(" ".join(cmd), cwd=str(cwd) if cwd else None, env=env,
-                         text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+                             text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     return out.stdout, out.returncode, out.stderr
+
 
 
 class GitHandler:

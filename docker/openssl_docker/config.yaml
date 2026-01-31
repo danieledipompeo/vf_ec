@@ -12,6 +12,14 @@ dataset:
 
 project:
 
+  - vim:
+      name: "vim"
+      repository: "https://github.com/vim/vim.git"
+      build:
+        commands: {}
+        flags: {}
+        compiler: ""
+
   - openssl:
       name: "openssl"
       repository: "https://github.com/openssl/openssl"
@@ -48,13 +56,6 @@ project:
         flags: {}
         compiler: ""
 
-  - vim:
-      name: "vim"
-      repository: "https://github.com/vim/vim.git"
-      build:
-        commands: {}
-        flags: {}
-        compiler: ""
 
   - ffmpeg:
       name: "FFmpeg"
