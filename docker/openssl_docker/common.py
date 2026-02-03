@@ -1,6 +1,8 @@
 import os
 import logging
 import subprocess
+import shlex
+import threading
 import re
 import pty
 import sys
@@ -44,13 +46,72 @@ def get_covered_files(cwd):
                 covered.add(full_path)
     return list(covered)
 
-def sh(cmd: list[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> tuple[str, int, str]:
-    print("+",str(cwd) + "/" if cwd else "./", " ".join(cmd), flush=True)
-    out = subprocess.run(" ".join(cmd), cwd=str(cwd) if cwd else None, env=env,
-                             text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    return out.stdout, out.returncode, out.stderr
+def sh(cmd: list[str] | str, cwd: Path | None = None, env: dict[str, str] | None = None, use_shell: bool = True) -> tuple[str, int, str]:
+    """
+    Execute a shell command and capture its output.
+    
+    Args:
+        cmd: Command to execute. Can be a list of strings (command and arguments) or a single string.
+        cwd: Working directory for the command execution. Defaults to None (current directory).
+        env: Environment variables to use for the process. Defaults to None (inherits parent process env).
+    
+    Returns:
+        A tuple containing:
+            - stdout (str): Standard output from the command
+            - returncode (int): Exit code of the process
+            - stderr (str): Standard error output from the command
+    
+    Note:
+        - If cmd is a list and contains shell special characters (|, ||, &&, ;, >, >>, <, $, `, (, )),
+          the command will be executed with shell=True.
+        - Command execution is printed to stdout with a prefix for debugging purposes.
+        - Output streams are read concurrently using separate threads to avoid deadlocks.
+        - stdin is set to DEVNULL, so no input can be provided to the command.
+    """
+    if isinstance(cmd, list):
+        # cmd_display = " ".join(shlex.quote(part) for part in cmd)
+        cmd_display = " ".join(cmd)
+    else:
+        cmd_display = cmd
+    print("+", str(cwd) + "/" if cwd else "./", cmd_display, flush=True)
 
+    # args: list[str] | str = cmd
+    # if isinstance(cmd, list):
+        # shell_tokens = ("|", "||", "&&", ";", ">", ">>", "<", "$", "`", "(", ")")
+        # if any(any(tok in part for tok in shell_tokens) for part in cmd):
+            # use_shell = True
+            # args = " ".join(cmd)
 
+    process = subprocess.Popen(
+        cmd_display,
+        cwd=str(cwd) if cwd else None,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        stdin=subprocess.DEVNULL,
+        shell=use_shell,
+        bufsize=1,
+    )
+
+    stdout_chunks: list[str] = []
+    stderr_chunks: list[str] = []
+
+    def _drain(stream, sink: list[str]):
+        if stream is None:
+            return
+        for line in stream:
+            sink.append(line)
+
+    t_out = threading.Thread(target=_drain, args=(process.stdout, stdout_chunks))
+    t_err = threading.Thread(target=_drain, args=(process.stderr, stderr_chunks))
+    t_out.start()
+    t_err.start()
+    process.wait()
+    t_out.join()
+    t_err.join()
+
+    return "".join(stdout_chunks), process.returncode, "".join(stderr_chunks)
 
 class GitHandler:
 
@@ -125,7 +186,7 @@ class EnergyHandler:
     #                  iterations: int = 5, timeout_ms: int = 5000, 
     #                  cool_down_sec: float = 1.0):
     @staticmethod
-    def measure_test(test: str, cmd: list[str], output_filename: str, project_dir: str):
+    def measure_test(test: str, cmd: list[str], output_filename: str, test_dir: str):
         """
         Measures energy consumption for a given test command using perf.
         
@@ -191,20 +252,21 @@ class EnergyHandler:
             # But since wrapped_cmd is a single string, we can still do: ["sh","-c", wrapped_cmd]
             perf_argv += ["sh", "-c", wrapped_cmd]
 
-            res = subprocess.run(
-                perf_argv, 
-                cwd=project_dir, 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.PIPE, 
-                text=True)
+            out, rc, err = sh(perf_argv, cwd=Path(test_dir), use_shell=True)
+            #res = subprocess.run(
+            #    perf_argv, 
+            #    cwd=test_dir, 
+            #    stdout=subprocess.PIPE, 
+            #    stderr=subprocess.PIPE, 
+            #    text=True)
             
-            if res.returncode != 0: 
+            if rc != 0: 
                 EnergyHandler.logger.error(
                     f"[ERROR] Test '{test}' failed during energy measurement.\n"
-                    f"Return code: {res.returncode}\n"
+                    f"Return code: {rc}\n"
                     f"Command: {wrapped_cmd}\n"
-                    f"STDERR: {res.stderr.strip()}\n"
-                    f"STDOUT: {res.stdout.strip()}"
+                    f"STDERR: {err.strip()}\n"
+                    f"STDOUT: {out.strip()}"
                 )
                 if os.path.exists(energy_file):
                     EnergyHandler.logger.warning(f"Removing perf output file due to error: {energy_file}")

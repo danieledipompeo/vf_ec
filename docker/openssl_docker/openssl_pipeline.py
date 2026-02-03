@@ -70,8 +70,8 @@ def process_commit(project : Project, commit: str, coverage: bool = True) -> lis
     print(f"\nRunning {len(suite)} tests...")
 
     pb = ProgressBar(len(suite), step=10)
-    # print(f"-- TEST SUITE LIMITED TO FIRST 5 TESTS OUT OF {len(suite)} TOTAL TESTS FOR DEMO PURPOSES.")
-    for i, t in enumerate(suite):
+    print(f"-- TEST SUITE LIMITED TO FIRST 5 TESTS OUT OF {len(suite)} TOTAL TESTS FOR DEMO PURPOSES.")
+    for i, t in enumerate(suite[:5]):
         pb.set(i)
 
         test = {
@@ -128,16 +128,13 @@ def coverage_energy(project: Project, commit: str, logger: logging.Logger):
     
     logger.info(f"Now computing energy for {commit[:8]}.")
     
-    # extract RAPL package events
-    # rapl_pkg = EnergyHandler.detect_rapl()
-
     kept_tests = [t for t in process_results.get('tests', []) if t.get('keep', True) and t.get('passed', False)]
 
     # prepare_for_energy_measurement()
     project.build(coverage=False)
     for test in kept_tests:
-        project.compute_energy(f"{commit}__{test['name']}")
-        # EnergyHandler.measure_test(rapl_pkg, test, commit, project.output_dir, project_dir=project.input_dir)
+        project.compute_energy(test['name'], commit)
+        #  EnergyHandler.measure_test(rapl_pkg, test, commit, project.output_dir, project_dir=project.input_dir)
 
     return process_results
 
@@ -168,14 +165,17 @@ def extract_test_covering_git_changes(coverage_results: dict, target_files: set)
     """
     Mark "keep" in tests that cover changed files. 
     
-    :param coverage_results: Description
-    :param target_files: Description
+    :param coverage_results: Dictionary with test results and coverage data
+    :param target_files: Set of files changed in the git commit (can be full paths)
     """
 
-    for target in target_files:
-        for test in coverage_results.get('tests', []):
-            covered_files = test.get('covered_files', [])
-            test['keep'] = target in covered_files
+    for test in coverage_results.get('tests', []):
+        covered_files = test.get('covered_files', [])
+        # Extract filenames from both target and covered files for comparison
+        covered_basenames = {os.path.basename(f) for f in covered_files}
+        
+        # Mark keep=True if test covers ANY of the changed files
+        test['keep'] = any(os.path.basename(target) in covered_basenames for target in target_files)
 
 def download_dataset(config: dict):
     """

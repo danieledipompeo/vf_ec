@@ -12,14 +12,6 @@ dataset:
 
 project:
 
-  - libarchive:
-      name: "libarchive"
-      repository: "https://github.com/libarchive/libarchive"
-      build:
-        commands: {}
-        flags: {}
-        compiler: ""
-
   - vim:
       name: "vim"
       repository: "https://github.com/vim/vim.git"
@@ -47,17 +39,25 @@ project:
           coverage_lflags: "--coverage"
         compiler: "gcc"
 
-  - libvncserver:
-      name: "libvncserver"
-      repository: "https://github.com/LibVNC/libvncserver.git"
+  - ffmpeg:
+      name: "FFmpeg"
+      repository: "https://github.com/FFmpeg/FFmpeg.git"
       build:
         commands: {}
         flags: {}
         compiler: ""
-        
-  - ffmpeg:
-      name: "FFmpeg"
-      repository: "https://github.com/FFmpeg/FFmpeg.git"
+  
+  - libarchive:
+      name: "libarchive"
+      repository: "https://github.com/libarchive/libarchive"
+      build:
+        commands: {}
+        flags: {}
+        compiler: ""
+
+  - libvncserver:
+      name: "libvncserver"
+      repository: "https://github.com/LibVNC/libvncserver.git"
       build:
         commands: {}
         flags: {}

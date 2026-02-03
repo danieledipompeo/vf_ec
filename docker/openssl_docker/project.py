@@ -26,7 +26,8 @@ class ProjectFactory:
             return LibRawProject(output_dir, input_dir)
         elif name.lower() == "libvncserver":
             return LibVNCServerProject(output_dir, input_dir)
-
+        elif name.lower() == "libarchive":
+            return LibarchiveProject(output_dir, input_dir)
         else:
             raise ValueError(f"Unknown project: {name}")
 
@@ -36,6 +37,7 @@ class Project(ABC):
     name = "generic_project"
     output_dir = "./output/generic_project"
     input_dir = "./input/generic_project"
+    test_dir = "./input/generic_project/tests"
 
     GCDA_FOLDER = "coverage-per-test"
 
@@ -64,22 +66,21 @@ class Project(ABC):
     def run_test(self, test_name: str) -> tuple[bool, Exception | None]:
         env_test = self._prepare_env_for_testing(test_name)
         cmd = self.get_test_cmd(test_name) #= ["make", test_name, "HARNESS_JOBS=1"]
-        return self._run(cmd, test_name, env_test, cwd=Path(self.input_dir))
+        return self._run(cmd, env_test)
 
     @abstractmethod
     def get_test_cmd(self, test_name: str) -> list[str]:
         pass
 
-    def compute_energy(self, test_name: str):
-        print("COMPUTE ENERGY DISABLED FOR TESTING")
-        # os.makedirs(os.path.join(self.output_dir, "energy_measurements"), exist_ok=True)
-        # EnergyHandler.measure_test(test_name, cmd=self.get_test_cmd(test_name),
-                                #    output_filename=os.path.join(self.output_dir, "energy_measurements", f"{test_name}_energy"),
-                                #    project_dir=self.input_dir)
+    def compute_energy(self, test_name: str, commit: str):
+        os.makedirs(os.path.join(self.output_dir, "energy_measurements"), exist_ok=True)
+        EnergyHandler.measure_test(test_name, cmd=self.get_test_cmd(test_name),
+                                   output_filename=os.path.join(self.output_dir, "energy_measurements", f"{commit}__{test_name}_energy"),
+                                   test_dir=self.test_dir)
     def _clean(self):
         sh(cmd=["make", "clean"], cwd=Path(self.input_dir))
 
-    def _build(self, n_proc=-1):
+    def _build(self, n_proc=-1, coverage=False):
         cmd = ["make"]
         if n_proc == -1:
             import os
@@ -92,18 +93,20 @@ class Project(ABC):
         return errorcode == 0
 
     def coverage_file(self, test_name: str) -> list[str]:
-        """
-        Retrieves a list of coverage file paths for a given test name.
-
-        :param root: The root directory where coverage files are located.
-        :param test_name: The name of the test for which coverage files are retrieved.
-        :return: A list of relative coverage file paths.
-        """
         gcda_path = Path(self.output_dir) / Project.GCDA_FOLDER / test_name
-        gcdas = [f.split(".dir/")[-1] for f in glob(str(gcda_path / "**/*.gcda"), recursive=True) if ".dir/" in f]
-        #gcdas = sorted((Path(self.output_dir) / Project.GCDA_FOLDER / test_name).glob("**/*.gcda"))
-        gcdas = [g.replace('.c.gcda', '.c') for g in gcdas]
-        gcdas = [g.replace('.gcda', '.c') for g in gcdas]
+        gcdas = []
+        for f in glob(str(gcda_path / "**/*.gcda"), recursive=True):
+            # Handle CMake structure (.dir/ folders)
+            rel_path = os.path.relpath(f, gcda_path)
+            if ".dir/" in rel_path:
+                source_name = rel_path.split(".dir/")[-1]
+            else:
+                # Handle Make structure (direct paths)
+                source_name = rel_path.split('src/')[-1]
+            
+            source_name = source_name.replace('.c.gcda', '.c').replace('.gcda', '.c')
+            gcdas.append(source_name)
+        
         return gcdas
 
     def _prepare_env_for_testing(self, test_name: str) -> dict:
@@ -114,9 +117,9 @@ class Project(ABC):
         env_test["GCOV_PREFIX"] = os.path.join(output_dir, test_name)
         return env_test
 
-    def _run(self, cmd: list[str], test_name: str, env_test: dict, cwd: Path) -> tuple[bool, Exception | None]:
+    def _run(self, cmd: list[str], env_test: dict) -> tuple[bool, Exception | None]:
         try:
-            stdout, errorcode, stderr = sh(cmd, cwd=cwd, env=env_test)
+            stdout, errorcode, stderr = sh(cmd, cwd=Path(self.test_dir), env=env_test)
             if errorcode != 0:
                 print(f"Test output:\n{stdout}\n{stderr}")
             return errorcode == 0, None
@@ -130,7 +133,7 @@ class Project(ABC):
         if not self._configure(cwd=Path(self.input_dir), coverage=coverage):
             self.logger.error("Configuration failed, cannot build.")
             return False
-        return self._build(n_proc=n_proc)
+        return self._build(n_proc=n_proc, coverage=coverage)
 
     def _configure(self, cwd: Path, coverage=False) -> bool | None:
         pass
@@ -142,17 +145,25 @@ class LibarchiveProject(Project):
         
         self._init(output_dir, input_dir, "libarchive", "https://github.com/libarchive/libarchive")  
 
+    def _run(self, cmd: list[str], test_name: str, env_test: dict, cwd: Path) -> tuple[bool, Exception | None]:
+        try:
+            _, errorcode, _ = sh(cmd, cwd=cwd / 'cmake_build', env=env_test)
+            return errorcode == 0, None
+        except Exception as e:
+            # self.logger.error(f"Test '{test_name}' failed with exception: {e}")
+            return False, e
+    
     def get_test_cmd(self, test_name: str) -> list[str]:
-        return ["cmake", "--build", "cmake_build", "-R", test_name, "--output-on-failure"]
+        return ["ctest", "-R", f"^{test_name}$", "--output-on-failure"]
     
     def get_test(self) -> list[str]:
-        stdout, code, stderr = sh(["cmake", "-N"], cwd=Path(self.input_dir) / "cmake_build")
+        stdout, code, stderr = sh(["ctest", "-N"], cwd=Path(self.input_dir) / "cmake_build")
         
         if code != 0:
             self.logger.error(f"Failed to get test list: {stderr}")
             return []
         
-        tests = [str(line).split(":")[1] for line in stdout.splitlines() if "Test #" in line]
+        tests = [str(line).split(":")[1].strip() for line in stdout.splitlines() if "Test #" in line]
         return tests
 
     def _configure(self, cwd: Path, coverage=False) -> bool:
@@ -161,9 +172,12 @@ class LibarchiveProject(Project):
                "-DENABLE_COVERAGE=OFF",
                "-DENABLE_TEST=ON"]
 
-        cmd .append("-DCMAKE_C_FLAGS=-g -O0 -Wno-error=unused-variable" + (" --coverage" if coverage else ""))
+        dcmake_c_flags = '-DCMAKE_C_FLAGS="-g -O0 -w"'
         if coverage:
-            cmd.append("-DCMAKE_EXE_LINKER_FLAGS=--coverage")
+            cmd.append('-DCMAKE_EXE_LINKER_FLAGS="-fprofile-arcs -ftest-coverage"')
+            dcmake_c_flags = '-DCMAKE_C_FLAGS="-g -O0 -w -fprofile-arcs -ftest-coverage"'
+
+        cmd.append(dcmake_c_flags)
 
         _, errorcode, _ = sh(cmd, cwd=cwd)
         return errorcode == 0
@@ -184,8 +198,6 @@ class LibarchiveProject(Project):
         
         _, errorcode, _ = sh(cmd=cmd, cwd=Path(self.input_dir))
         return errorcode == 0
-        
-    
 
 class LibVNCServerProject(Project):
 
@@ -392,27 +404,29 @@ class OpenSSLProject(Project):
 class VimProject(Project):
 
     TEST_DIR = "src/testdir"
+    SOURCE_DIR = "src"
 
     def __init__(self, output_dir, input_dir):
         super().__init__()
         
         self._init(output_dir, input_dir, "vim", "https://github.com/vim/vim")
-
-    def _prepare_env_for_testing(self, test_name: str) -> dict:
-        output_dir = os.path.join(self.output_dir, Project.GCDA_FOLDER)
-        sh(["mkdir", "-p", output_dir])
-        env_test = os.environ.copy()
-        env_test["GCOV_PREFIX_STRIP"] = "3"
-        env_test["GCOV_PREFIX"] = os.path.join(output_dir, test_name)
-        env_test["LINES"] = "24"
-        env_test["COLUMNS"] = "80"
-        return env_test
+        self.test_dir = os.path.join(self.input_dir, VimProject.TEST_DIR)
+        self.input_dir = os.path.join(self.input_dir, VimProject.SOURCE_DIR)
 
     def get_test_cmd(self, test_name: str) -> list[str]:
-        return ["make", test_name, "HARNESS_JOBS=1", "LINES=24", "COLUMNS=80"]
+        cmd = ["make", test_name, "HARNESS_JOBS=1", "LINES=24", "COLUMNS=80"]
+        # cmd = self.get_test_cmd(test_name)
+        # Wrap the command with script to create a pseudo-terminal with proper size
+        # script -q -e -c "command" /dev/null creates a PTY that vim can query
+        # set rows and cols to 24x80 to avoid test failures due to terminal size
+        cmd_str = '"stty rows 24 cols 80;'
+        cmd_str += " ".join(cmd)
+        cmd_str += '"'
+        return ["script", "-q", "-f", "-e", "-c", f"{cmd_str}", "/dev/null"]
+
 
     def get_test(self) -> list[str]:
-        test_dir = Path(self.input_dir) / VimProject.TEST_DIR
+        test_dir = Path(self.test_dir)
 
         test_names = glob(f"{test_dir}/test_*.vim") 
         test_names += glob(f"{test_dir}/test_*.in")
@@ -424,24 +438,16 @@ class VimProject(Project):
         
     def run_test(self, test_name: str) -> tuple[bool, Exception | None]:
         env_test = self._prepare_env_for_testing(test_name)
-        cmd = self.get_test_cmd(test_name)
-        # Wrap the command with script to create a pseudo-terminal with proper size
-        # script -q -e -c "command" /dev/null creates a PTY that vim can query
-        # set rows and cols to 24x80 to avoid test failures due to terminal size
-        cmd_str = '"stty rows 24 cols 80;'
-        cmd_str += " ".join(cmd)
-        cmd_str += '"'
-        wrapped_cmd = ["script", "-q", "-e", "-c", f"{cmd_str}", "/dev/null"]
-        return self._run(wrapped_cmd, test_name, env_test, cwd=Path(self.input_dir) / "src")
-    
-    def _run(self, cmd: list[str], test_name: str, env_test: dict, cwd: Path) -> tuple[bool, Exception | None]:
-        try:
-            stdout, errorcode, stderr = sh(cmd, cwd=cwd, env=env_test)
-            if errorcode != 0:
-                print(f"Test output:\n{stdout}\n{stderr}")
-            return errorcode == 0, None
-        except Exception as e:
-            return False, e
+        #cmd = self.get_test_cmd(test_name)
+        ## Wrap the command with script to create a pseudo-terminal with proper size
+        ## script -q -e -c "command" /dev/null creates a PTY that vim can query
+        ## set rows and cols to 24x80 to avoid test failures due to terminal size
+        #cmd_str = '"stty rows 24 cols 80;'
+        #cmd_str += " ".join(cmd)
+        #cmd_str += '"'
+        #wrapped_cmd = ["script", "-q", "-f", "-e", "-c", f"{cmd_str}", "/dev/null"]
+        wrapped_cmd = self.get_test_cmd(test_name)
+        return self._run(wrapped_cmd, env_test)
     
     def _configure(self, cwd, coverage=False) -> bool:
         # Vim configure
@@ -454,13 +460,6 @@ class VimProject(Project):
             "--without-x"
         ]
         
-        # env_test = os.environ.copy()
-        # env_test["CFLAGS"] = "-O0 "
-        # if coverage:
-        #     env_test["CFLAGS"] += "--coverage "
-        #     # Often helpful to link coverage too
-        #     env_test["LDFLAGS"] = "--coverage "
-
         _, errorcode, err = sh(config_args, cwd=cwd)
         if errorcode != 0:
             self.logger.error(f"Configuration failed with error: {err}")
@@ -469,14 +468,14 @@ class VimProject(Project):
         self.logger.info("Configuration succeeded with standard ./config.")
         return True
     
-    def _build(self, n_proc=1):
+    def _build(self, n_proc=1, coverage=False):
         cmd = ["make"]
-        cmd_args = ['PROFILE_CFLAGS="-g -O0 -fprofile-arcs -ftest-coverage -DWE_ARE_PROFILING -DUSE_GCOV_FLUSH"', 'LDFLAGS="--coverage"']
-        cmd += cmd_args
+
+        if coverage:
+            cmd += ['PROFILE_CFLAGS="-g -O0 -fprofile-arcs -ftest-coverage -DWE_ARE_PROFILING -DUSE_GCOV_FLUSH"', 'LDFLAGS="--coverage"']
+
         if n_proc == -1:
-            import os
-            nproc = os.cpu_count() or 1
-            cmd.append(f"-j{nproc}")
+            cmd.append(f"-j")
         else:
             cmd.append(f"-j{n_proc}")
         
