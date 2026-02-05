@@ -36,6 +36,6 @@ WORKDIR /app
 
 # ------------------------------------------------------------------
 
-COPY openssl_pipeline.py config.py common.py project.py config.yaml /app/
+COPY openssl_pipeline.py common.py project.py config.yaml /app/
 
 CMD ["python3", "openssl_pipeline.py"]
