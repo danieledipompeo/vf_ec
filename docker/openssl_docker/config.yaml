@@ -11,10 +11,9 @@ dataset:
   csv_file: cwe_projects
 
 project:
-
-  - vim:
-      name: "vim"
-      repository: "https://github.com/vim/vim.git"
+  - curl:
+      name: "curl"
+      repository: "https://github.com/curl/curl"
       build:
         commands: {}
         flags: {}
@@ -24,29 +23,10 @@ project:
       name: "openssl"
       repository: "https://github.com/openssl/openssl"
       build:
-        commands:
-          configure:
-            primary: "./config -d no-shared no-asm no-threads"
-            fallback: "./Configure linux-x86_64 no-shared no-asm"
-          compile:
-            clean: "make clean"
-            depend: "make depend"
-            make: "make"
-        flags:
-          cflags: "-fPIC -Wno-error -Wno-implicit-function-declaration -Wno-format-security -std=gnu89 -O0"
-          lflags: "-no-pie"
-          coverage_cflags: "--coverage"
-          coverage_lflags: "--coverage"
-        compiler: "gcc"
-
-  - ffmpeg:
-      name: "FFmpeg"
-      repository: "https://github.com/FFmpeg/FFmpeg.git"
-      build:
         commands: {}
         flags: {}
         compiler: ""
-  
+
   - libarchive:
       name: "libarchive"
       repository: "https://github.com/libarchive/libarchive"
@@ -54,14 +34,32 @@ project:
         commands: {}
         flags: {}
         compiler: ""
-
-  - libvncserver:
-      name: "libvncserver"
-      repository: "https://github.com/LibVNC/libvncserver.git"
+  
+  - vim:
+      name: "vim"
+      repository: "https://github.com/vim/vim.git"
       build:
         commands: {}
         flags: {}
         compiler: ""
+
+  # TO BE TESTED
+  #- ffmpeg:
+  #    name: "FFmpeg"
+  #    repository: "https://github.com/FFmpeg/FFmpeg.git"
+  #    build:
+  #      commands: {}
+  #      flags: {}
+  #      compiler: ""
+  
+
+  #- libvncserver:
+  #    name: "libvncserver"
+  #    repository: "https://github.com/LibVNC/libvncserver.git"
+  #    build:
+  #      commands: {}
+  #      flags: {}
+  #      compiler: ""
  
   ## Needs additional configuration to build
   #- php-src:
@@ -80,27 +78,6 @@ project:
   #      flags: {}
   #      compiler: ""
 
-  
-test:
-  strategies:
-    modern:
-      recipe_dir: "test/recipes"
-      file_pattern: "*.t"
-      command_template: "make test TESTS='{test_name}'"
-    legacy:
-      test_dir: "test"
-      file_patterns:
-        - "test_*.c"
-        - "*test.c"
-      build_command_template: "make {test_name}"
-      run_binary_template: "test/{test_name}"
-  limit: null  # Set to integer to limit number of tests, null for all tests
-
-coverage:
-  enabled: true
-  gcda_pattern: "*.gcda"
-  source_extension: ".c"
-
 energy:
   iterations: 5
   timeout_ms: 1000
@@ -117,17 +94,3 @@ energy:
     options:
       all_cpus: true
       delimiter: ","
-
-pipeline:
-  csv_write_interval: 50
-  logging:
-    level: "INFO"
-    format: "%(asctime)s - %(levelname)s - %(message)s"
-    file: "pipeline_execution.log"
-
-git:
-  commands:
-    reset: "git reset --hard"
-    clean: "git clean -fdx"
-    checkout: "git checkout -f {commit}"
-    diff_tree: "git diff-tree --no-commit-id --name-only -r {commit}"

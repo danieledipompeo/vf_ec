@@ -1,12 +1,12 @@
 import os
-import logging
 import subprocess
-import shlex
 import threading
 import re
-import pty
-import sys
 from pathlib import Path
+
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 class ProgressBar:
     def __init__(self, total, length=40, step=1):
@@ -46,7 +46,11 @@ def get_covered_files(cwd):
                 covered.add(full_path)
     return list(covered)
 
-def sh(cmd: list[str] | str, cwd: Path | None = None, env: dict[str, str] | None = None, use_shell: bool = True) -> tuple[str, int, str]:
+def sh(cmd: list[str] | str, 
+       cwd: Path | None = None, 
+       env: dict[str, str] | None = None, 
+       use_shell: bool = True
+       ) -> tuple[str, int, str]:
     """
     Execute a shell command and capture its output.
     
@@ -69,11 +73,10 @@ def sh(cmd: list[str] | str, cwd: Path | None = None, env: dict[str, str] | None
         - stdin is set to DEVNULL, so no input can be provided to the command.
     """
     if isinstance(cmd, list):
-        # cmd_display = " ".join(shlex.quote(part) for part in cmd)
         cmd_display = " ".join(cmd)
     else:
         cmd_display = cmd
-    print("+", str(cwd) + "/" if cwd else "./", cmd_display, flush=True)
+    logger.debug("+ %s%s %s", str(cwd) + "/" if cwd else "./", cmd_display, "(shell)" if use_shell else "")
 
     # args: list[str] | str = cmd
     # if isinstance(cmd, list):
@@ -148,15 +151,10 @@ class GitHandler:
 
 class EnergyHandler:
 
-    logger = logging.getLogger("EnergyHandler")
-    handler = logging.FileHandler("energy_handler.log")
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
-    
     ITERATION_TIMEOUT_MS = 5000
     COOL_DOWN_SEC = 1.0
     ITERATIONS = 5
-      
+    output_dir = "energy_measurements"      
 
     @staticmethod
     def detect_rapl(perf_bin="perf"):
@@ -176,7 +174,7 @@ class EnergyHandler:
                 if not m.endswith("/"):
                     m += "/"
                 events.add(m)
-        EnergyHandler.logger.info(f"Detected RAPL energy events: {sorted(events)}")
+        logger.info(f"Detected RAPL energy events: {sorted(events)}")
         return sorted(events)
 
     # @staticmethod
@@ -225,11 +223,9 @@ class EnergyHandler:
         perf_events = ",".join(events + ["cycles", "instructions"])
         
         pb = ProgressBar(EnergyHandler.ITERATIONS)
-        # output_dir = os.path.join(output_, "energy_measurements") 
-        # os.makedirs(output_dir, exist_ok=True)
 
         timeout_ms = EnergyHandler.ITERATION_TIMEOUT_MS  # e.g. 5s default, tune per test
-        EnergyHandler.logger.info(f"Measuring energy for test '{test}': "
+        logger.info(f"Measuring energy for test '{test}': "
               f"{EnergyHandler.ITERATIONS} iterations × {timeout_ms}ms timeout each")
 
         for iteration in range(EnergyHandler.ITERATIONS):
@@ -261,7 +257,7 @@ class EnergyHandler:
             #    text=True)
             
             if rc != 0: 
-                EnergyHandler.logger.error(
+                logger.error(
                     f"[ERROR] Test '{test}' failed during energy measurement.\n"
                     f"Return code: {rc}\n"
                     f"Command: {wrapped_cmd}\n"
@@ -269,10 +265,10 @@ class EnergyHandler:
                     f"STDOUT: {out.strip()}"
                 )
                 if os.path.exists(energy_file):
-                    EnergyHandler.logger.warning(f"Removing perf output file due to error: {energy_file}")
+                    logger.warning(f"Removing perf output file due to error: {energy_file}")
                     os.remove(energy_file)
                     
-            EnergyHandler.logger.info(f"[COOL DOWN] {EnergyHandler.COOL_DOWN_SEC} seconds...")
+            logger.info(f"[COOL DOWN] {EnergyHandler.COOL_DOWN_SEC} seconds...")
             time.sleep(EnergyHandler.COOL_DOWN_SEC)
 
     @staticmethod
