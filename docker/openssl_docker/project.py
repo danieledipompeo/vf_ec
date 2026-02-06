@@ -147,9 +147,9 @@ class CurlProject(Project):
         super().__init__()
         
         self._init(output_dir, input_dir, "curl", "https://github.com/curl/curl")
-        self.build_dir = os.path.join(self.input_dir, "tests")
-        if os.path.exists(os.path.join(self.input_dir, "CMakeLists.txt")):  
-            self.build_dir = os.path.join(self.input_dir, CMAKE_BUILD_DIR)
+        # self.build_dir = os.path.join(self.input_dir, "tests")
+        # if os.path.exists(os.path.join(self.input_dir, "CMakeLists.txt")):  
+            # self.build_dir = os.path.join(self.input_dir, CMAKE_BUILD_DIR)
     
     def coverage_file(self, test_name: str) -> list[str]:
         building_dir = Path(self.input_dir)
@@ -208,8 +208,12 @@ class CurlProject(Project):
     def _build(self, n_proc=-1, coverage=False):
         if os.path.exists(os.path.join(self.input_dir, CMAKE_BUILD_DIR)):
             cmd = ["cmake", "--build", CMAKE_BUILD_DIR]
-        else:
-            cmd = ["make"]
+            self.build_dir = os.path.join(self.input_dir, CMAKE_BUILD_DIR)
+            _, errorcode, _ = sh(cmd=cmd, cwd=Path(self.input_dir))
+            return errorcode == 0
+
+        self.build_dir = os.path.join(self.input_dir, "tests")
+        cmd = ["make"]
             
         if n_proc == -1:
             nproc = os.cpu_count() or 1
