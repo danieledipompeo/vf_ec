@@ -1,5 +1,6 @@
 # create an abstract class for projects
 from abc import ABC, abstractmethod
+import cmd
 from glob import glob
 import os
 from pathlib import Path
@@ -34,6 +35,8 @@ class ProjectFactory:
             return CurlProject(output_dir, input_dir)
         elif name.lower() == "libxml2":
             return LibXML2Project(output_dir, input_dir)
+        elif name.lower() == "imagemagick":
+            return ImageMagickProject(output_dir, input_dir)
         else:
             raise ValueError(f"Unknown project: {name}")
 
@@ -140,6 +143,75 @@ class Project(ABC):
 
     def _configure(self, cwd: Path, coverage=False) -> bool | None:
         pass
+
+class ImageMagickProject(Project):
+    
+    def __init__(self, output_dir, input_dir) -> None:
+        super().__init__()
+        
+        self._init(output_dir, input_dir, "ImageMagick", "https://github.com/ImageMagick/ImageMagick")
+        
+    def get_test_cmd(self, test_name: str, coverage=True) -> list[str]:
+        # Autotools: each test is a self-contained script/binary.
+        # Run it directly from the tests/ directory — no arguments needed,
+        # unlike libxml2's runtest which takes a filter.
+        # .tap is IM7, .sh is IM6 — check which exists.
+        tests_dir = Path(self.input_dir) / "tests"
+        for ext in (".tap", ".sh"):
+            candidate = tests_dir / f"{test_name}{ext}"
+            if candidate.exists():
+                return ['make', 'check', f"TESTS={candidate}"]
+        return []
+    
+    def get_test(self) -> list[str]:
+        # Autotools: each test is a .tap (IM7) or .sh (IM6) script in tests/.
+        # The stem of the filename is the test name — exactly what make check
+        # reports and what you pass to run individually.
+        # Also picks up drawtest and wandtest (standalone C binaries with .tap wrappers).
+        tests_dir = Path(self.input_dir) / "tests"
+        # .tap is IM7+, .sh is IM6 — try tap first, fall back to sh
+        scripts = sorted(tests_dir.glob("*.tap"))
+        if not scripts:
+            scripts = sorted(tests_dir.glob("*.sh"))
+        tests = [s.stem for s in scripts]
+
+        return tests
+    
+    def _configure(self, cwd: Path, coverage=False) -> bool | None:
+        cmd = ["./configure"]
+        if coverage:
+            cmd.append("--enable-gcov")
+            
+        _, errorcode, _ = sh(cmd, cwd=cwd)
+        return errorcode == 0
+        
+    def _build(self, n_proc=-1, coverage=False):
+        cmd = ["make"]
+        if n_proc == -1:
+            nproc = os.cpu_count() or 1
+            cmd.append(f"-j{nproc}")
+        else:
+            cmd.append(f"-j{n_proc}")
+        
+        _, errorcode, _ = sh(cmd=cmd, cwd=Path(self.input_dir))
+        return errorcode == 0
+
+    def _run(self, cmd: list[str]) -> tuple[bool, dict]:
+        stdout, errorcode, stderr = sh(cmd, cwd=Path(self.input_dir))
+        if errorcode != 0:
+            self.logger.error(f"Test output:\n{stdout}\n{stderr}")
+        return errorcode == 0, {"stdout": stdout, "stderr": stderr, "errorcode": errorcode}
+
+    def compute_energy(self, test_name: str, commit: str):
+        os.makedirs(os.path.join(self.output_dir, "energy_measurements"), exist_ok=True)
+        cmd = self.get_test_cmd(test_name, coverage=False)
+        out_filename = os.path.join(self.output_dir, "energy_measurements", f"{commit}__{test_name}_energy")
+
+        EnergyHandler.measure_test(test_name, cmd=cmd,
+                                   output_filename=out_filename,
+                                   test_dir=self.input_dir)
+    
+    
 
 class LibXML2Project(Project):
     

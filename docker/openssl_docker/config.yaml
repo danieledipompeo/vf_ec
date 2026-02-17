@@ -11,6 +11,14 @@ dataset:
   csv_file: cwe_projects
 
 project:
+  - ImageMagick:
+      name: "ImageMagick"
+      repository: "https://github.com/ImageMagick/ImageMagick"
+      build:
+        commands: {}
+        flags: {}
+        compiler: ""
+
   - libxml2:
       name: "libxml2"
       repository: "https://gitlab.gnome.org/GNOME/libxml2.git"
