@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from glob import glob
 import os
 from pathlib import Path
-import sys
+import re
 
 from common import GitHandler, EnergyHandler, sh
 from logger import get_logger
@@ -32,6 +32,8 @@ class ProjectFactory:
             return LibarchiveProject(output_dir, input_dir)
         elif name.lower() == "curl":
             return CurlProject(output_dir, input_dir)
+        elif name.lower() == "libxml2":
+            return LibXML2Project(output_dir, input_dir)
         else:
             raise ValueError(f"Unknown project: {name}")
 
@@ -83,7 +85,6 @@ class Project(ABC):
     def _build(self, n_proc=-1, coverage=False) -> bool:
         cmd = ["make"]
         if n_proc == -1:
-            import os
             nproc = os.cpu_count() or 1
             cmd.append(f"-j{nproc}")
         else:
@@ -140,6 +141,110 @@ class Project(ABC):
     def _configure(self, cwd: Path, coverage=False) -> bool | None:
         pass
 
+class LibXML2Project(Project):
+    
+    def __init__(self, output_dir, input_dir) -> None:
+        super().__init__()
+        
+        self._init(output_dir, input_dir, "libxml2", "https://gitlab.gnome.org/GNOME/libxml2")
+        self.build_dir = os.path.join(self.input_dir)
+        
+    def get_test_cmd(self, test_name: str, coverage=True) -> list[str]:
+        if os.path.exists(os.path.join(self.input_dir, CMAKE_BUILD_DIR)):
+            self.logger.info("Using CMake logic to get test command for libxml2.")
+            return ["ctest", "-R", f"^{test_name}$", "--output-on-failure"]
+        else:
+            self.logger.info("Using Autotools logic to get test command for libxml2.")
+            return ["./runtest", f'"{test_name}"']
+    
+    def get_test(self) -> list[str]:
+        if os.path.exists(os.path.join(self.input_dir, CMAKE_BUILD_DIR)):
+            self.logger.info("Using CMake logic to extract test names for libxml2.")
+            stdout, code, stderr = sh(["ctest", "-N"], cwd=Path(self.input_dir) / CMAKE_BUILD_DIR)
+        
+            if code != 0:
+                self.logger.error(f"Failed to get test list: {stderr}")
+                return []
+            tests = [str(line).split(":")[1].strip() for line in stdout.splitlines() if "Test #" in line]
+            return tests
+        else:
+            self.logger.info("Using Autotools logic to extract test names for libxml2.")
+            # Autotools: test names are the desc fields in testDescriptions[]
+            # inside runtest.c. main() filters with strstr(desc, argv[1]),
+            # so the full desc string is what gets passed to ./runtest.
+            runtest_c = Path(self.input_dir) / "runtest.c"
+            source = runtest_c.read_text(encoding="utf-8", errors="replace")
+
+            # Grab the testDescriptions[] array body
+            array_match = re.search(
+                r"testDesc\w*\s+testDescriptions\[\]\s*=\s*\{(.+?)\}\s*;",
+                source,
+                re.DOTALL,
+            )
+            if array_match:
+                # Each entry opens with { "desc string" — grab that first field
+                tests = re.findall(r'\{\s*"([^"]+)"', array_match.group(1))
+
+            return tests
+    
+    def compute_energy(self, test_name: str, commit: str):
+        os.makedirs(os.path.join(self.output_dir, "energy_measurements"), exist_ok=True)
+        cmd = self.get_test_cmd(test_name, coverage=False)
+        out_filename = os.path.join(self.output_dir, "energy_measurements", f"{commit}__{test_name}_energy")
+
+        test_dir = self.input_dir
+        if os.path.exists(os.path.join(self.input_dir, CMAKE_BUILD_DIR)):
+            test_dir = os.path.join(self.input_dir, CMAKE_BUILD_DIR)
+                                    
+        EnergyHandler.measure_test(test_name, cmd=cmd,
+                                   output_filename=out_filename,
+                                   test_dir=test_dir)
+        
+    def _run(self, cmd: list[str]) -> tuple[bool, dict]:
+        build_dir = Path(self.build_dir)
+        if os.path.exists(os.path.join(self.input_dir, CMAKE_BUILD_DIR)):
+            build_dir = Path(self.input_dir) / CMAKE_BUILD_DIR
+        
+        stdout, errorcode, stderr = sh(cmd, cwd=build_dir)
+        if errorcode != 0:
+            self.logger.error(f"Test output:\n{stdout}\n{stderr}")
+        return errorcode == 0, {"stdout": stdout, "stderr": stderr, "errorcode": errorcode}
+    
+    def _build(self, n_proc=-1, coverage=False):
+        if os.path.exists(os.path.join(self.input_dir, "CMakeLists.txt")):
+            cmd = ["cmake", "--build", CMAKE_BUILD_DIR]
+            _, errorcode, _ = sh(cmd=cmd, cwd=Path(self.input_dir))
+            return errorcode == 0
+        else:
+            return super()._build(n_proc=n_proc, coverage=coverage)
+        
+
+    def _configure(self, cwd: Path, coverage=False) -> bool | None:
+        if os.path.exists(os.path.join(cwd, "CMakeLists.txt")):
+            self.logger.info(f"Running CMake configuration for {self.name}.")
+            cmd = ["cmake", "-S", ".", "-B", CMAKE_BUILD_DIR, 
+                   "-DCMAKE_BUILD_TYPE=Debug", 
+                   "-DENABLE_CURL_MANUAL=OFF", 
+                   "-DENABLE_TESTS=ON", 
+                   "-DENABLE_CURL_DEBUG=ON"
+                   ]
+            if coverage:
+                cmd.append("-DCMAKE_C_FLAGS=--coverage")
+        else:
+            self.logger.info("Running legacy Autotools configuration for libxml2.")
+            if not os.path.exists(os.path.join(cwd, "configure")):
+                _, rc, _ = sh(["./autogen.sh"], cwd=Path(cwd))
+                if rc != 0:
+                    self.logger.error("Autotools autogen.sh failed.")
+                    return False
+            cmd=['./configure']
+            if coverage:
+                cmd.insert(0, 'CFLAGS="--coverage"')
+                cmd.insert(1, 'LDFLAGS="--coverage"')
+
+        _, errorcode, _ = sh(cmd, cwd=cwd)
+        return errorcode == 0
+        
 
 class CurlProject(Project):
     
@@ -317,14 +422,12 @@ class LibarchiveProject(Project):
         return errorcode == 0
     
     def _build(self, n_proc=-1, coverage=False):
-        import os
         if os.path.exists(os.path.join(self.input_dir, CMAKE_BUILD_DIR)):
             cmd = ["cmake", "--build", CMAKE_BUILD_DIR]
         else:
             cmd = ["make"]
             
         if n_proc == -1:
-            import os
             nproc = os.cpu_count() or 1
             cmd.append(f"-j{nproc}")
         else:
