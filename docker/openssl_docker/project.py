@@ -151,6 +151,24 @@ class ImageMagickProject(Project):
         
         self._init(output_dir, input_dir, "ImageMagick", "https://github.com/ImageMagick/ImageMagick")
         
+    def coverage_file(self, test_name: str) -> list[str]:
+        building_dir = Path(self.input_dir)
+        gco_files = building_dir.rglob("*.gcda")
+        covered = []
+        for file in gco_files:
+            obj_dir = file.parent
+            stdout, code, stderr = sh(["gcov", "-n", "-o", str(obj_dir), str(file)], cwd=building_dir)
+            if code != 0:
+                self.logger.error(f"gcov failed for {file} with error: {stderr}")
+                continue
+            
+            covered_file = self._extract_covered_file(stdout, obj_dir)
+            if covered_file:
+                covered_file = str(Path(covered_file).relative_to(self.input_dir))
+                covered.append(covered_file)
+                
+        return covered
+    
     def get_test_cmd(self, test_name: str, coverage=True) -> list[str]:
         # Autotools: each test is a self-contained script/binary.
         # Run it directly from the tests/ directory — no arguments needed,
@@ -211,8 +229,6 @@ class ImageMagickProject(Project):
                                    output_filename=out_filename,
                                    test_dir=self.input_dir)
     
-    
-
 class LibXML2Project(Project):
     
     def __init__(self, output_dir, input_dir) -> None:
