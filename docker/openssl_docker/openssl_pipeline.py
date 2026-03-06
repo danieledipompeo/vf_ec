@@ -3,6 +3,7 @@ import csv
 import logging
 import json
 from pathlib import Path
+import time
 import yaml
 
 from common import EnergyHandler, GitHandler, ProgressBar, sh
@@ -62,24 +63,31 @@ def process_commit(project : Project, commit: str, coverage: bool = True) -> lis
     
     logger.info(f"Running {len(suite)} tests...")
 
-    pb = ProgressBar(len(suite), step=10)
+    # pb = ProgressBar(len(suite), step=10)
     # logger.warning(f"-- TEST SUITE LIMITED TO FIRST 5 TESTS OUT OF {len(suite)} TOTAL TESTS FOR DEMO PURPOSES.")
+    l_suite = len(suite)
     for i, t in enumerate(suite):
-        pb.set(i)
+        # pb.set(i)
+        logger.info(f"Running test {i+1}/{l_suite}: {t}")
 
         test = {
             "name": t,
             "passed": False,
-            "covered_files": []
+            "covered_files": [],
+            "duration": 0.0
         }
 
         # Clean previous coverage data
         sh(["find", ".", "-name", "*.gcda", "-delete"], Path(project.output_dir))
         sh(["find", ".", "-name", "*.gcno", "-delete"], Path(project.output_dir))
-        logger.debug(f"Coverage data cleaned before running test '{t}'.")
+        logger.info(f"Coverage data cleaned before running test '{t}'.")
 
         # run test
+        start_time = time.time()
         test['passed'], error = project.run_test(t)
+        test['duration'] = time.time() - start_time
+        logger.info(f" --- Test '{t}' completed in {test['duration']:.2f}s")
+        
         if not test['passed']:
             logger.debug(f"Test '{t}' failed with error: {error}")
             continue
@@ -101,7 +109,7 @@ def compute_coverage(project: Project, commit: str):
         logger.error(f"Failed to checkout commit: {commit}")
         return None
     
-    print(f"-- Processing commit age: {GitHandler.get_age_of_commit(project.input_dir, commit)}")
+    logger.info(f"-- Processing commit age: {GitHandler.get_age_of_commit(project.input_dir, commit)}")
     
     git_changed_files= GitHandler.get_git_diff_files(project.input_dir, commit)
     
@@ -238,6 +246,7 @@ def main():
         
         # logger.debug("--- PAIRS LIMITED TO FIRST 2 FOR DEMO PURPOSES.")
         for i, (vuln, fix) in enumerate(pairs):
+            start_time = time.time()
             logger.info(f"[{i+1}/{len(pairs)}] Processing Pair: {vuln[:8]} -> {fix[:8]}")
 
             coverage_dict = compute_coverage(project, fix)
@@ -265,6 +274,7 @@ def main():
                     project.compute_energy(test['name'], commit)
 
             coverage_path = os.path.join(project.output_dir, f"{project.name}_{vuln[:8]}_{fix[:8]}_coverage.json")
+            coverage_dict['execution_time'] = time.time() - start_time
             with open(coverage_path, "w") as f:
                 json.dump(coverage_dict, f, indent=2)
             logger.info(f"Saved coverage results to {coverage_path}")

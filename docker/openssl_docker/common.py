@@ -222,19 +222,20 @@ class EnergyHandler:
 
         perf_events = ",".join(events + ["cycles", "instructions"])
         
-        pb = ProgressBar(EnergyHandler.ITERATIONS)
+        # pb = ProgressBar(EnergyHandler.ITERATIONS)
 
         timeout_ms = EnergyHandler.ITERATION_TIMEOUT_MS  # e.g. 5s default, tune per test
         logger.info(f"Measuring energy for test '{test}': "
               f"{EnergyHandler.ITERATIONS} iterations × {timeout_ms}ms timeout each")
 
         for iteration in range(EnergyHandler.ITERATIONS):
-            pb.set(iteration)
+            # pb.set(iteration)
+            logger.debug(" --- Starting iteration %d for test '%s'", iteration + 1, test)
 
             energy_file = output_filename + f"__{iteration}.csv"
+            iteration_count_file = output_filename + f"__{iteration}_count.txt"
 
-            # cmd = ["make", "test", f"TESTS={test.get('name')}", "HARNESS_JOBS=1"]
-            wrapped_cmd = EnergyHandler._wrap_until_timeout(cmd, timeout_ms)
+            wrapped_cmd = EnergyHandler._wrap_until_timeout(cmd, timeout_ms, iteration_count_file)
 
             # Build perf as argv list (safer than huge shell string)
             perf_argv = [
@@ -249,12 +250,6 @@ class EnergyHandler:
             perf_argv += ["sh", "-c", wrapped_cmd]
 
             out, rc, err = sh(perf_argv, cwd=Path(test_dir), use_shell=True)
-            #res = subprocess.run(
-            #    perf_argv, 
-            #    cwd=test_dir, 
-            #    stdout=subprocess.PIPE, 
-            #    stderr=subprocess.PIPE, 
-            #    text=True)
             
             if rc != 0: 
                 logger.error(
@@ -272,16 +267,20 @@ class EnergyHandler:
             time.sleep(EnergyHandler.COOL_DOWN_SEC)
 
     @staticmethod
-    def _wrap_until_timeout(test_cmd: list[str], timeout_ms: int) -> str:
+    def _wrap_until_timeout(test_cmd: list[str], timeout_ms: int, iteration_count_file: str | None = None) -> str:
         import shlex
         """
         Returns a bash command that runs `test_cmd` repeatedly until timeout expires.
         - uses monotonic-ish wall clock via SECONDS (bash built-in, second resolution)
         - avoids killing a running iteration mid-command (it checks deadline BETWEEN iterations)
+        - if iteration_count_file is provided, saves the loop iteration count to that file
         """
         # Use bash -lc so we can rely on bash features and keep quoting predictable
         # SECONDS is integer seconds since shell start; good enough for energy runs (>= 2-5s).
         timeout_s = max(1, int((timeout_ms + 999) / 1000))  # ceil to seconds
+
+        # Build the echo statement if a count file is specified
+        count_line = f"echo $iteration_count > {shlex.quote(iteration_count_file)}" if iteration_count_file else ""
 
         # Important:
         # - `set -e` makes failures stop the loop and propagate non-zero to perf (you want this)
@@ -292,9 +291,12 @@ class EnergyHandler:
                 f"""
                 set -e
                 end=$((SECONDS + {timeout_s}))
+                iteration_count=0
                 while [ $SECONDS -lt $end ]; do
                   {" ".join(test_cmd)}
+                  ((iteration_count += 1))
                 done
+                {count_line}
                 """
             )
         )

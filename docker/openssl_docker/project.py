@@ -1,6 +1,5 @@
 # create an abstract class for projects
 from abc import ABC, abstractmethod
-import cmd
 from glob import glob
 import os
 from pathlib import Path
@@ -14,56 +13,62 @@ logger = get_logger(__name__)
 CMAKE_BUILD_DIR = "cmake_build"
 
 class ProjectFactory:
+    """Factory for creating project instances based on project name."""
     
     @staticmethod
     def get_project(name: str, input_dir: str, output_dir: str) -> 'Project':
-        if name.lower() == "openssl":
-            return OpenSSLProject(output_dir, input_dir)
-        # elif name.lower() == "ffmpeg":
-            # return FfmpegProject(output_dir, input_dir)
-        elif name.lower() == "vim":
-            return VimProject(output_dir, input_dir)
-        # elif name.lower() == "php-src":
-        #     return PhpSrcProject(output_dir, input_dir) 
-        # elif name.lower() == 'libraw':
-            # return LibRawProject(output_dir, input_dir)
-        # elif name.lower() == "libvncserver":
-        #     return LibVNCServerProject(output_dir, input_dir)
-        elif name.lower() == "libarchive":
-            return LibarchiveProject(output_dir, input_dir)
-        elif name.lower() == "curl":
-            return CurlProject(output_dir, input_dir)
-        elif name.lower() == "libxml2":
-            return LibXML2Project(output_dir, input_dir)
-        elif name.lower() == "imagemagick":
-            return ImageMagickProject(output_dir, input_dir)
-        else:
+        """
+        Create and return a project instance.
+        
+        Args:
+            name: Project name (case-insensitive). Supported: openssl, vim, libarchive, 
+                  curl, libxml2, imagemagick.
+            input_dir: Root directory for input/source code.
+            output_dir: Root directory for output/results.
+        
+        Returns:
+            A Project subclass instance.
+        
+        Raises:
+            ValueError: If project name is not recognized.
+        """
+        projects = {
+            "openssl": OpenSSLProject,
+            "vim": VimProject,
+            "libarchive": LibarchiveProject,
+            "curl": CurlProject,
+            "libxml2": LibXML2Project,
+            "imagemagick": ImageMagickProject
+        }
+        project_cls = projects.get(name.lower())
+        if project_cls is None:
             raise ValueError(f"Unknown project: {name}")
+        return project_cls(output_dir, input_dir)
 
 
 class Project(ABC):
+    """Abstract base class for managing project builds, tests, and energy measurements.
     
-    name = "generic_project"
-    output_dir = "./output/generic_project"
-    input_dir = "./input/generic_project"
-    build_dir = "./input/generic_project/tests"
-
+    Handles common functionality for cloning, building, testing, and measuring energy consumption
+    across multiple open-source projects with different build systems (CMake, Autotools, Make).
+    Subclasses customize behavior through template methods and hooks.
+    """
+    
     GCDA_FOLDER = "coverage-per-test"
 
-    def _init(self, output_dir: str, input_dir: str, name: str, project_repo: str) -> None:
+    def __init__(self, output_dir: str, input_dir: str, name: str, project_repo: str) -> None:
         super().__init__()
         self.logger = logger
-        
         self.name = name
-        self.output_dir = os.path.join(output_dir, self.name)
         
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
+        self.output_dir = Path(output_dir) / self.name
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        self.input_dir = os.path.join(input_dir, self.name)
-
-        if not os.path.exists(os.path.join(self.input_dir, ".git")):
+        self.input_dir = Path(input_dir) / self.name
+        if not (self.input_dir / ".git").exists():
             GitHandler.clone_repo(input_dir, project_repo)
+        
+        self.build_dir = self.input_dir / "tests"
         
     @abstractmethod
     def get_test(self):
@@ -74,16 +79,27 @@ class Project(ABC):
         pass
 
     def run_test(self, test_name: str, coverage=True) -> tuple[bool, dict]:
-        # env_test = self._prepare_env_for_testing(test_name)
-        cmd = self.get_test_cmd(test_name, coverage=coverage) #= ["make", test_name, "HARNESS_JOBS=1"]
-        return self._run(cmd)#, env_test)
+        cmd = self.get_test_cmd(test_name, coverage=coverage)
+        return self._run(cmd)
 
-    @abstractmethod
     def compute_energy(self, test_name: str, commit: str):
-        pass 
+        """Default implementation for energy measurement."""
+        energy_dir = self.output_dir / "energy_measurements"
+        energy_dir.mkdir(parents=True, exist_ok=True)
+        cmd = self.get_test_cmd(test_name, coverage=False)
+        out_filename = str(energy_dir / f"{commit}__{test_name}_energy")
+        test_dir = self._get_test_dir_for_energy()
+        
+        EnergyHandler.measure_test(test_name, cmd=cmd,
+                                   output_filename=out_filename,
+                                   test_dir=str(test_dir))
+    
+    def _get_test_dir_for_energy(self) -> Path:
+        """Override to customize test directory for energy measurement."""
+        return self.build_dir 
 
     def _clean(self):
-        sh(cmd=["make", "clean"], cwd=Path(self.input_dir))
+        sh(cmd=["make", "clean"], cwd=self.input_dir)
 
     def _build(self, n_proc=-1, coverage=False) -> bool:
         cmd = ["make"]
@@ -93,7 +109,7 @@ class Project(ABC):
         else:
             cmd.append(f"-j{n_proc}")
         
-        _, errorcode, _ = sh(cmd=cmd, cwd=Path(self.input_dir))
+        _, errorcode, _ = sh(cmd=cmd, cwd=self.input_dir)
         return errorcode == 0
 
     def _resolve_source_path(self, reported_file: str, objdir: Path) -> Path:
@@ -110,7 +126,10 @@ class Project(ABC):
                 return str(real_path)
 
     def coverage_file(self, test_name: str) -> list[str]:
-        building_dir = Path(self.build_dir)
+        return self._process_coverage_files(Path(self.build_dir))
+    
+    def _process_coverage_files(self, building_dir: Path) -> list[str]:
+        """Process .gcda files and return list of covered files."""
         gco_files = building_dir.rglob("*.gcda")
         covered = []
         for file in gco_files:
@@ -134,47 +153,86 @@ class Project(ABC):
         return errorcode == 0, {"stdout": stdout, "stderr": stderr, "errorcode": errorcode}
 
     def build(self, coverage=False, n_proc=1) -> bool:
-        if os.path.exists(os.path.join(self.input_dir, "Makefile")):
+        if (self.input_dir / "Makefile").exists():
             self._clean()
-        if not self._configure(cwd=Path(self.input_dir), coverage=coverage):
+        if not self._configure(cwd=self.input_dir, coverage=coverage):
             self.logger.error("Configuration failed, cannot build.")
             return False
         return self._build(n_proc=n_proc, coverage=coverage)
 
+    @abstractmethod
     def _configure(self, cwd: Path, coverage=False) -> bool | None:
         pass
-
-class ImageMagickProject(Project):
     
+    def _get_ctest_tests(self, build_dir: Path) -> list[str]:
+        """Extract test names from CTest."""
+        stdout, code, stderr = sh(["ctest", "-N"], cwd=build_dir)
+        if code != 0:
+            self.logger.error(f"Failed to get test list: {stderr}")
+            return []
+        return [str(line).split(":")[1].strip() for line in stdout.splitlines() if "Test #" in line]
+    
+    def _has_cmake_build(self) -> bool:
+        """Check if project uses CMake build system."""
+        return (self.input_dir / CMAKE_BUILD_DIR).exists()
+    
+    def _build_cmake(self, n_proc: int = -1) -> bool:
+        """Build project using CMake."""
+        cmd = ["cmake", "--build", CMAKE_BUILD_DIR]
+        if n_proc == -1:
+            nproc = os.cpu_count() or 1
+            cmd.append(f"-j{nproc}")
+        elif n_proc > 1:
+            cmd.append(f"-j{n_proc}")
+        
+        _, errorcode, _ = sh(cmd=cmd, cwd=self.input_dir)
+        return errorcode == 0
+
+class TcpDumpProject(Project):
     def __init__(self, output_dir, input_dir) -> None:
-        super().__init__()
-        
-        self._init(output_dir, input_dir, "ImageMagick", "https://github.com/ImageMagick/ImageMagick")
-        
-    def coverage_file(self, test_name: str) -> list[str]:
-        building_dir = Path(self.input_dir)
-        gco_files = building_dir.rglob("*.gcda")
-        covered = []
-        for file in gco_files:
-            obj_dir = file.parent
-            stdout, code, stderr = sh(["gcov", "-n", "-o", str(obj_dir), str(file)], cwd=building_dir)
-            if code != 0:
-                self.logger.error(f"gcov failed for {file} with error: {stderr}")
-                continue
-            
-            covered_file = self._extract_covered_file(stdout, obj_dir)
-            if covered_file:
-                covered_file = str(Path(covered_file).relative_to(self.input_dir))
-                covered.append(covered_file)
-                
-        return covered
+        super().__init__(output_dir, input_dir, "tcpdump", "https://github.com/the-tcpdump-group/tcpdump.git")
     
     def get_test_cmd(self, test_name: str, coverage=True) -> list[str]:
-        # Autotools: each test is a self-contained script/binary.
-        # Run it directly from the tests/ directory — no arguments needed,
-        # unlike libxml2's runtest which takes a filter.
-        # .tap is IM7, .sh is IM6 — check which exists.
-        tests_dir = Path(self.input_dir) / "tests"
+        return ["make", "check", f"TESTS={test_name}"]
+    
+    def get_test(self) -> list[str]:
+        tests_dir = self.input_dir / "tests"
+        test_files = sorted(tests_dir.glob("*.test"))
+        return [t.stem for t in test_files]
+
+    def _configure(self, cwd: Path, coverage=False) -> bool | None:
+        cmd = ["./autogen.sh"]
+        
+        _, rc, err = sh(cmd, cwd=cwd)
+        if rc != 0:
+            self.logger.error(f"Failed to configure tcpdump: {err}")
+            return False
+        
+        cmd = ["./configure"]
+        _, rc, err = sh(cmd, cwd=cwd)
+        if rc != 0:
+            self.logger.error(f"Failed to configure tcpdump: {err}")
+            return False
+        return True
+
+class ImageMagickProject(Project):
+    """ImageMagick project using Autotools build system.
+    
+    Tests are defined as .tap (IM7+) or .sh (IM6) scripts in tests/ directory.
+    Coverage files are processed from the input directory.
+    """
+    
+    def __init__(self, output_dir, input_dir) -> None:
+        super().__init__(output_dir, input_dir, "ImageMagick", "https://github.com/ImageMagick/ImageMagick")
+        
+    def coverage_file(self, test_name: str) -> list[str]:
+        return self._process_coverage_files(self.input_dir)
+    
+    def _get_test_dir_for_energy(self) -> Path:
+        return self.input_dir
+    
+    def get_test_cmd(self, test_name: str, coverage=True) -> list[str]:
+        tests_dir = self.input_dir / "tests"
         for ext in (".tap", ".sh"):
             candidate = tests_dir / f"{test_name}{ext}"
             if candidate.exists():
@@ -191,9 +249,7 @@ class ImageMagickProject(Project):
         scripts = sorted(tests_dir.glob("*.tap"))
         if not scripts:
             scripts = sorted(tests_dir.glob("*.sh"))
-        tests = [s.stem for s in scripts]
-
-        return tests
+        return [s.stem for s in scripts]
     
     def _configure(self, cwd: Path, coverage=False) -> bool | None:
         cmd = ["./configure"]
@@ -211,34 +267,28 @@ class ImageMagickProject(Project):
         else:
             cmd.append(f"-j{n_proc}")
         
-        _, errorcode, _ = sh(cmd=cmd, cwd=Path(self.input_dir))
+        _, errorcode, _ = sh(cmd=cmd, cwd=self.input_dir)
         return errorcode == 0
 
     def _run(self, cmd: list[str]) -> tuple[bool, dict]:
-        stdout, errorcode, stderr = sh(cmd, cwd=Path(self.input_dir))
+        stdout, errorcode, stderr = sh(cmd, cwd=self.input_dir)
         if errorcode != 0:
             self.logger.error(f"Test output:\n{stdout}\n{stderr}")
         return errorcode == 0, {"stdout": stdout, "stderr": stderr, "errorcode": errorcode}
-
-    def compute_energy(self, test_name: str, commit: str):
-        os.makedirs(os.path.join(self.output_dir, "energy_measurements"), exist_ok=True)
-        cmd = self.get_test_cmd(test_name, coverage=False)
-        out_filename = os.path.join(self.output_dir, "energy_measurements", f"{commit}__{test_name}_energy")
-
-        EnergyHandler.measure_test(test_name, cmd=cmd,
-                                   output_filename=out_filename,
-                                   test_dir=self.input_dir)
     
 class LibXML2Project(Project):
+    """LibXML2 project supporting both CMake and Autotools build systems.
+    
+    Automatically detects and switches between CMake (newer builds) and Autotools (legacy).
+    Tests are discovered from CTest or extracted from runtest.c sources.
+    """
     
     def __init__(self, output_dir, input_dir) -> None:
-        super().__init__()
-        
-        self._init(output_dir, input_dir, "libxml2", "https://gitlab.gnome.org/GNOME/libxml2")
-        self.build_dir = os.path.join(self.input_dir)
+        super().__init__(output_dir, input_dir, "libxml2", "https://gitlab.gnome.org/GNOME/libxml2")
+        self.build_dir = self.input_dir
         
     def get_test_cmd(self, test_name: str, coverage=True) -> list[str]:
-        if os.path.exists(os.path.join(self.input_dir, CMAKE_BUILD_DIR)):
+        if (self.input_dir / CMAKE_BUILD_DIR).exists():
             self.logger.info("Using CMake logic to get test command for libxml2.")
             return ["ctest", "-R", f"^{test_name}$", "--output-on-failure"]
         else:
@@ -246,52 +296,33 @@ class LibXML2Project(Project):
             return ["./runtest", f'"{test_name}"']
     
     def get_test(self) -> list[str]:
-        if os.path.exists(os.path.join(self.input_dir, CMAKE_BUILD_DIR)):
+        if self._has_cmake_build():
             self.logger.info("Using CMake logic to extract test names for libxml2.")
-            stdout, code, stderr = sh(["ctest", "-N"], cwd=Path(self.input_dir) / CMAKE_BUILD_DIR)
-        
-            if code != 0:
-                self.logger.error(f"Failed to get test list: {stderr}")
-                return []
-            tests = [str(line).split(":")[1].strip() for line in stdout.splitlines() if "Test #" in line]
-            return tests
+            return self._get_ctest_tests(self.input_dir / CMAKE_BUILD_DIR)
         else:
             self.logger.info("Using Autotools logic to extract test names for libxml2.")
-            # Autotools: test names are the desc fields in testDescriptions[]
-            # inside runtest.c. main() filters with strstr(desc, argv[1]),
-            # so the full desc string is what gets passed to ./runtest.
-            runtest_c = Path(self.input_dir) / "runtest.c"
+            runtest_c = self.input_dir / "runtest.c"
             source = runtest_c.read_text(encoding="utf-8", errors="replace")
 
-            # Grab the testDescriptions[] array body
             array_match = re.search(
                 r"testDesc\w*\s+testDescriptions\[\]\s*=\s*\{(.+?)\}\s*;",
                 source,
                 re.DOTALL,
             )
             if array_match:
-                # Each entry opens with { "desc string" — grab that first field
                 tests = re.findall(r'\{\s*"([^"]+)"', array_match.group(1))
 
             return tests
     
-    def compute_energy(self, test_name: str, commit: str):
-        os.makedirs(os.path.join(self.output_dir, "energy_measurements"), exist_ok=True)
-        cmd = self.get_test_cmd(test_name, coverage=False)
-        out_filename = os.path.join(self.output_dir, "energy_measurements", f"{commit}__{test_name}_energy")
-
-        test_dir = self.input_dir
-        if os.path.exists(os.path.join(self.input_dir, CMAKE_BUILD_DIR)):
-            test_dir = os.path.join(self.input_dir, CMAKE_BUILD_DIR)
-                                    
-        EnergyHandler.measure_test(test_name, cmd=cmd,
-                                   output_filename=out_filename,
-                                   test_dir=test_dir)
+    def _get_test_dir_for_energy(self) -> Path:
+        if self._has_cmake_build():
+            return self.input_dir / CMAKE_BUILD_DIR
+        return self.input_dir
         
     def _run(self, cmd: list[str]) -> tuple[bool, dict]:
-        build_dir = Path(self.build_dir)
-        if os.path.exists(os.path.join(self.input_dir, CMAKE_BUILD_DIR)):
-            build_dir = Path(self.input_dir) / CMAKE_BUILD_DIR
+        build_dir = self.build_dir
+        if (self.input_dir / CMAKE_BUILD_DIR).exists():
+            build_dir = self.input_dir / CMAKE_BUILD_DIR
         
         stdout, errorcode, stderr = sh(cmd, cwd=build_dir)
         if errorcode != 0:
@@ -299,16 +330,14 @@ class LibXML2Project(Project):
         return errorcode == 0, {"stdout": stdout, "stderr": stderr, "errorcode": errorcode}
     
     def _build(self, n_proc=-1, coverage=False):
-        if os.path.exists(os.path.join(self.input_dir, "CMakeLists.txt")):
-            cmd = ["cmake", "--build", CMAKE_BUILD_DIR]
-            _, errorcode, _ = sh(cmd=cmd, cwd=Path(self.input_dir))
-            return errorcode == 0
+        if (self.input_dir / "CMakeLists.txt").exists():
+            return self._build_cmake(n_proc)
         else:
             return super()._build(n_proc=n_proc, coverage=coverage)
         
 
     def _configure(self, cwd: Path, coverage=False) -> bool | None:
-        if os.path.exists(os.path.join(cwd, "CMakeLists.txt")):
+        if (cwd / "CMakeLists.txt").exists():
             self.logger.info(f"Running CMake configuration for {self.name}.")
             cmd = ["cmake", "-S", ".", "-B", CMAKE_BUILD_DIR, 
                    "-DCMAKE_BUILD_TYPE=Debug", 
@@ -320,8 +349,8 @@ class LibXML2Project(Project):
                 cmd.append("-DCMAKE_C_FLAGS=--coverage")
         else:
             self.logger.info("Running legacy Autotools configuration for libxml2.")
-            if not os.path.exists(os.path.join(cwd, "configure")):
-                _, rc, _ = sh(["./autogen.sh"], cwd=Path(cwd))
+            if not (cwd / "configure").exists():
+                _, rc, _ = sh(["./autogen.sh"], cwd=cwd)
                 if rc != 0:
                     self.logger.error("Autotools autogen.sh failed.")
                     return False
@@ -335,38 +364,22 @@ class LibXML2Project(Project):
         
 
 class CurlProject(Project):
+    """Curl project supporting both CMake and Autotools build systems.
+    
+    Hybrid build support with buildconf for Autotools and CMake for modern builds.
+    Tests discovered via CTest for CMake builds or runtests.pl for Autotools.
+    Coverage files processed from build or input directory depending on build system.
+    """
     
     def __init__(self, output_dir, input_dir) -> None:
-        super().__init__()
-        
-        self._init(output_dir, input_dir, "curl", "https://github.com/curl/curl")
-        # self.build_dir = os.path.join(self.input_dir, "tests")
-        # if os.path.exists(os.path.join(self.input_dir, "CMakeLists.txt")):  
-            # self.build_dir = os.path.join(self.input_dir, CMAKE_BUILD_DIR)
+        super().__init__(output_dir, input_dir, "curl", "https://github.com/curl/curl")
     
     def coverage_file(self, test_name: str) -> list[str]:
-        building_dir = Path(self.input_dir)
-        if os.path.exists(os.path.join(self.input_dir, CMAKE_BUILD_DIR)):
-            building_dir = Path(self.build_dir)
-
-        gco_files = building_dir.rglob("*.gcda")
-        covered = []
-        for file in gco_files:
-            obj_dir = file.parent # Folder containing the .gcda|gcno|o files
-            stdout, code, stderr = sh(["gcov", "-n", "-o", str(obj_dir), str(file)], cwd=building_dir)
-            if code != 0:
-                self.logger.error(f"gcov failed for {file} with error: {stderr}")
-                continue
-            
-            covered_file = self._extract_covered_file(stdout, obj_dir)
-            if covered_file:
-                covered_file = str(Path(covered_file).relative_to(self.input_dir))
-                covered.append(covered_file)
-                
-        return covered
+        building_dir = self.build_dir if self._has_cmake_build() else self.input_dir
+        return self._process_coverage_files(building_dir)
     
     def _configure(self, cwd: Path, coverage=False) -> bool:
-        if os.path.exists(os.path.join(cwd, "CMakeLists.txt")):
+        if (cwd / "CMakeLists.txt").exists():
             self.logger.info("Running CMake configuration for curl.")
             cmd = ["cmake", "-S", ".", "-B", CMAKE_BUILD_DIR, 
                    "-DCMAKE_BUILD_TYPE=Debug", 
@@ -399,13 +412,11 @@ class CurlProject(Project):
         return errorcode == 0
     
     def _build(self, n_proc=-1, coverage=False):
-        if os.path.exists(os.path.join(self.input_dir, CMAKE_BUILD_DIR)):
-            cmd = ["cmake", "--build", CMAKE_BUILD_DIR]
-            self.build_dir = os.path.join(self.input_dir, CMAKE_BUILD_DIR)
-            _, errorcode, _ = sh(cmd=cmd, cwd=Path(self.input_dir))
-            return errorcode == 0
+        if self._has_cmake_build():
+            self.build_dir = self.input_dir / CMAKE_BUILD_DIR
+            return self._build_cmake(n_proc)
 
-        self.build_dir = os.path.join(self.input_dir, "tests")
+        self.build_dir = self.input_dir / "tests"
         cmd = ["make"]
             
         if n_proc == -1:
@@ -414,16 +425,16 @@ class CurlProject(Project):
         else:
             cmd.append(f"-j{n_proc}")
         
-        _, errorcode, _ = sh(cmd=cmd, cwd=Path(self.input_dir))
+        _, errorcode, _ = sh(cmd=cmd, cwd=self.input_dir)
         if errorcode != 0:
             return False
         
         self.logger.debug("Building tests for curl.") 
-        _, errorcode, _ = sh(cmd=["make", "-C", "tests"], cwd=Path(self.input_dir))
+        _, errorcode, _ = sh(cmd=["make", "-C", "tests"], cwd=self.input_dir)
         return errorcode == 0
     
     def get_test_cmd(self, test_name: str, coverage=True) -> list[str]:
-        if os.path.exists(os.path.join(self.input_dir, CMAKE_BUILD_DIR)):
+        if (self.input_dir / CMAKE_BUILD_DIR).exists():
             cmd = ["ctest", "-R", f"^{test_name}$", "--output-on-failure"]
         else:
             cmd = ["./runtests.pl", f"{test_name.replace('test', '')}"]
@@ -431,67 +442,39 @@ class CurlProject(Project):
         return cmd
 
     def get_test(self) -> list[str]:
-        tests = []
-        # CMake logic
-        build_dir = os.path.join(self.input_dir, CMAKE_BUILD_DIR)
-        if os.path.exists(build_dir):
-            stdout, returncode, stderr = sh(["ctest", "-N"], cwd=Path(build_dir))
-            for line in stdout.splitlines():
-                if "Test #" in line:
-                    parts = line.split(":")
-                    if len(parts) >= 2:
-                        tests.append(parts[1].strip())
-        # Autotools logic
+        build_dir = self.input_dir / CMAKE_BUILD_DIR
+        if build_dir.exists():
+            return self._get_ctest_tests(build_dir)
         else:
-            test_dir = Path(self.input_dir) / "tests" 
+            tests = []
+            test_dir = self.input_dir / "tests" 
             test_data_dir = test_dir / "data"
             tests = list(test_data_dir.rglob("test*"))
             tests = [t.name for t in tests]
         
         return tests
-    
-    def compute_energy(self, test_name: str, commit: str):
-        os.makedirs(os.path.join(self.output_dir, "energy_measurements"), exist_ok=True)
-        cmd = self.get_test_cmd(test_name, coverage=False)
-        out_filename = os.path.join(self.output_dir, "energy_measurements", f"{commit}__{test_name}_energy")
-                                    
-        EnergyHandler.measure_test(test_name, cmd=cmd,
-                                   output_filename=out_filename,
-                                   test_dir=self.build_dir)
+
         
 class LibarchiveProject(Project):
+    """Libarchive project using CMake build system.
+    
+    Pure CMake-based project with consistent test discovery via CTest.
+    All tests run in the cmake_build directory.
+    """
     
     def __init__(self, output_dir, input_dir) -> None:
-        super().__init__()
-        
-        self._init(output_dir, input_dir, "libarchive", "https://github.com/libarchive/libarchive")  
-        self.build_dir = os.path.join(self.input_dir, CMAKE_BUILD_DIR)
-
-    def compute_energy(self, test_name: str, commit: str):
-        os.makedirs(os.path.join(self.output_dir, "energy_measurements"), exist_ok=True)
-        cmd = self.get_test_cmd(test_name, coverage=False)
-        out_filename = os.path.join(self.output_dir, "energy_measurements", f"{commit}__{test_name}_energy")
-                                    
-        EnergyHandler.measure_test(test_name, cmd=cmd,
-                                   output_filename=out_filename,
-                                   test_dir=self.build_dir)
+        super().__init__(output_dir, input_dir, "libarchive", "https://github.com/libarchive/libarchive")  
+        self.build_dir = self.input_dir / CMAKE_BUILD_DIR
 
     def _run(self, cmd: list[str]) -> tuple[bool, dict]:
-        stdout, errorcode, stderr = sh(cmd, cwd=Path(self.build_dir))
+        stdout, errorcode, stderr = sh(cmd, cwd=self.build_dir)
         return errorcode == 0, {"stdout": stdout, "stderr": stderr, "errorcode": errorcode}
     
     def get_test_cmd(self, test_name: str, coverage=True) -> list[str]:
         return ["ctest", "-R", f"^{test_name}$", "--output-on-failure"]
     
     def get_test(self) -> list[str]:
-        stdout, code, stderr = sh(["ctest", "-N"], cwd=Path(self.build_dir))
-        
-        if code != 0:
-            self.logger.error(f"Failed to get test list: {stderr}")
-            return []
-        
-        tests = [str(line).split(":")[1].strip() for line in stdout.splitlines() if "Test #" in line]
-        return tests
+        return self._get_ctest_tests(self.build_dir)
 
     def _configure(self, cwd: Path, coverage=False) -> bool:
         cmd = ["cmake", "-B", CMAKE_BUILD_DIR, "-S", ".",
@@ -510,22 +493,17 @@ class LibarchiveProject(Project):
         return errorcode == 0
     
     def _build(self, n_proc=-1, coverage=False):
-        if os.path.exists(os.path.join(self.input_dir, CMAKE_BUILD_DIR)):
-            cmd = ["cmake", "--build", CMAKE_BUILD_DIR]
-        else:
-            cmd = ["make"]
-            
-        if n_proc == -1:
-            nproc = os.cpu_count() or 1
-            cmd.append(f"-j{nproc}")
-        else:
-            cmd.append(f"-j{n_proc}")
-        
-        _, errorcode, _ = sh(cmd=cmd, cwd=Path(self.input_dir))
-        return errorcode == 0
+        if self._has_cmake_build():
+            return self._build_cmake(n_proc)
+        return super()._build(n_proc=n_proc, coverage=coverage)
 
 
 class OpenSSLProject(Project):
+    """OpenSSL project using custom Make-based build system.
+    
+    Uses ./Configure script for configuration with custom make targets for testing.
+    Test names and coverage flags are project-specific constants.
+    """
     
     CFLAG_COVERAGE="-fPIC -DOPENSSL_PIC -DOPENSSL_THREADS -D_REENTRANT -DDSO_DLFCN -DHAVE_DLFCN_H -m64 -DL_ENDIAN -DTERMIO -O0 -Wall -DMD32_REG_T=int --coverage"
     SHARED_LDFLAGS="-m64 --coverage"
@@ -536,9 +514,7 @@ class OpenSSLProject(Project):
     EX_LIBS = [f'EX_LIBS="{EX_LDL}"']
     
     def __init__(self, output_dir, input_dir) -> None:
-        super().__init__()
-
-        self._init(output_dir, input_dir, "openssl", "https://github.com/openssl/openssl") 
+        super().__init__(output_dir, input_dir, "openssl", "https://github.com/openssl/openssl") 
         self.test_dir = self.input_dir
         self.build_dir = self.input_dir
 
@@ -553,11 +529,11 @@ class OpenSSLProject(Project):
         return cmd
         
     def get_test(self) -> list[str]:
-        if os.path.exists(os.path.join(self.test_dir, "test", "recipes")):
-            out, _, _ = sh(['make', 'list-tests'], cwd=Path(self.build_dir))
+        if (self.test_dir / "test" / "recipes").exists():
+            out, _, _ = sh(['make', 'list-tests'], cwd=self.build_dir)
             tests = [line.strip() for line in out.splitlines() if line.strip()]
         else:
-            tests = glob(os.path.join(self.test_dir, "test", "*.c"))    
+            tests = glob(str(self.test_dir / "test" / "*.c"))    
             tests = [os.path.splitext(os.path.basename(t))[0] for t in tests] 
         
         return tests 
@@ -574,7 +550,7 @@ class OpenSSLProject(Project):
             cmd.append(f"-j")
         else:
             cmd.append(f"-j{n_proc}")
-        _, errorcode, _ = sh(cmd=cmd, cwd=Path(self.input_dir))
+        _, errorcode, _ = sh(cmd=cmd, cwd=self.input_dir)
         return errorcode == 0
     
     def _configure(self, cwd: Path, coverage=False) -> bool:
@@ -589,31 +565,30 @@ class OpenSSLProject(Project):
         self.logger.info("Configuration succeeded.")
         return True
 
-    def compute_energy(self, test_name: str, commit: str):
-        os.makedirs(os.path.join(self.output_dir, "energy_measurements"), exist_ok=True)
-        cmd = self.get_test_cmd(test_name, coverage=False)
-        out_filename = os.path.join(self.output_dir, "energy_measurements", f"{commit}__{test_name}_energy")
-        
-        EnergyHandler.measure_test(test_name, cmd=cmd,
-                                   output_filename=out_filename,
-                                   test_dir=self.build_dir)
+
     
 class VimProject(Project):
+    """Vim project using Autotools build system with special test harness.
+    
+    Tests are .vim or .in scripts in src/testdir/. Runs tests in pseudo-terminal
+    via script command to handle interactive test execution. Coverage files use
+    special path handling relative to SOURCE_DIR.
+    """
 
     TEST_DIR = "src/testdir"
     SOURCE_DIR = "src"
 
     def __init__(self, output_dir, input_dir):
-        super().__init__()
+        super().__init__(output_dir, input_dir, "vim", "https://github.com/vim/vim")
+        self.source_dir = self.input_dir / VimProject.SOURCE_DIR
+        self.test_dir = self.input_dir / VimProject.TEST_DIR
+        self.build_dir = self.source_dir 
         
-        self._init(output_dir, input_dir, "vim", "https://github.com/vim/vim")
-        self.test_dir = os.path.join(self.input_dir, VimProject.TEST_DIR)
-        self.input_dir = os.path.join(self.input_dir, VimProject.SOURCE_DIR)
-        self.build_dir = self.input_dir
-
-    # FIX: vim coverage file extraction 
+    def _get_test_dir_for_energy(self) -> Path:
+        return self.test_dir
+    
     def coverage_file(self, test_name: str) -> list[str]:
-        building_dir = Path(self.build_dir)
+        building_dir = self.build_dir
         gco_files = building_dir.rglob("*.gcda")
         covered = []
         for file in gco_files:
@@ -632,29 +607,32 @@ class VimProject(Project):
 
     def get_test_cmd(self, test_name: str, coverage=True) -> list[str]:
         cmd = ["make", test_name, "HARNESS_JOBS=1", "LINES=24", "COLUMNS=80"]
-        # Wrap the command with script to create a pseudo-terminal with proper size
-        # script -q -e -c "command" /dev/null creates a PTY that vim can query
-        # set rows and cols to 24x80 to avoid test failures due to terminal size
         cmd_str = '"stty rows 24 cols 80;'
         cmd_str += " ".join(cmd)
         cmd_str += '"'
         return ["script", "-q", "-f", "-e", "-c", f"{cmd_str}", "/dev/null"]
 
     def get_test(self) -> list[str]:
-        test_dir = Path(self.test_dir)
+        skipped_tests = ["test_filechanged", 
+                        #  "test_cursor_func",
+                        #  "test_cursorline", 
+                         "test_terminal",
+                         "test_recover",
+                         "test_functions",
+                         "test_buffer"]
+        test_names = glob(str(self.test_dir / "test_*.vim")) 
+        test_names += glob(str(self.test_dir / "test_*.in"))
 
-        test_names = glob(f"{test_dir}/test_*.vim") 
-        test_names += glob(f"{test_dir}/test_*.in")
-
-        test_names = [t.replace(f"{test_dir}/", "") for t in test_names]
-        test_names = [t.replace(".in", "") for t in test_names]
-        test_names = [t.replace(".vim", "") for t in test_names]
+        # Clean up test names by removing directory path and file extensions
+        test_names = [t.replace(f"{self.test_dir}/", "") for t in test_names]
+        test_names = [t.replace(".in", "").replace(".vim", "") for t in test_names]
+        
+        # Filter out skipped tests
+        test_names = [t for t in test_names if not any(skipped in t for skipped in skipped_tests)]
+        
         return test_names
         
-    def _configure(self, cwd, coverage=False) -> bool:
-        # Vim configure
-        # --with-features=huge: Enables most features (needed for many tests)
-        # --enable-gui=no --without-x: Disables GUI (Critical for Docker)
+    def _configure(self, cwd: Path, coverage=False) -> bool:
         config_args = [
             "./configure",
             "--with-features=huge",
@@ -662,7 +640,7 @@ class VimProject(Project):
             "--without-x"
         ]
         
-        _, errorcode, err = sh(config_args, cwd=cwd)
+        _, errorcode, err = sh(config_args, cwd=self.source_dir)
         if errorcode != 0:
             self.logger.error(f"Configuration failed with error: {err}")
             return False
@@ -681,22 +659,8 @@ class VimProject(Project):
         else:
             cmd.append(f"-j{n_proc}")
         
-        _, errorcode, _ = sh(cmd=cmd, cwd=Path(self.input_dir))
+        _, errorcode, _ = sh(cmd=cmd, cwd=self.source_dir)
         return errorcode == 0
-
-    def compute_energy(self, test_name: str, commit: str):
-        os.makedirs(os.path.join(self.output_dir, "energy_measurements"), exist_ok=True)
-        cmd = self.get_test_cmd(test_name, coverage=False)
-        out_filename = os.path.join(self.output_dir, "energy_measurements", f"{commit}__{test_name}_energy")
-
-        EnergyHandler.measure_test(test_name, cmd=cmd,
-                                   output_filename=out_filename,
-                                   test_dir=self.test_dir)
-    
-#class FfmpegProject(Project):
-#
-#    def __init__(self, output_dir, input_dir):            
-#        super().__init__()
 #        
 #        self._init(output_dir, input_dir, "FFmpeg","https://github.com/FFmpeg/FFmpeg.git")
 #        

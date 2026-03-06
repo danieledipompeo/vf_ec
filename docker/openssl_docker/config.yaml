@@ -11,21 +11,29 @@ dataset:
   csv_file: cwe_projects
 
 project:
-  - ImageMagick:
-      name: "ImageMagick"
-      repository: "https://github.com/ImageMagick/ImageMagick"
+  - vim:
+      name: "vim"
+      repository: "https://github.com/vim/vim.git"
       build:
         commands: {}
         flags: {}
         compiler: ""
 
-  - libxml2:
-      name: "libxml2"
-      repository: "https://gitlab.gnome.org/GNOME/libxml2.git"
-      build:
-        commands: {}
-        flags: {}
-        compiler: ""
+  #- ImageMagick:
+  #    name: "ImageMagick"
+  #    repository: "https://github.com/ImageMagick/ImageMagick"
+  #    build:
+  #      commands: {}
+  #      flags: {}
+  #      compiler: ""
+
+  #- libxml2:
+  #    name: "libxml2"
+  #    repository: "https://gitlab.gnome.org/GNOME/libxml2.git"
+  #    build:
+  #      commands: {}
+  #      flags: {}
+  #      compiler: ""
 
   #- curl:
   #    name: "curl"
@@ -51,15 +59,17 @@ project:
   #      flags: {}
   #      compiler: ""
   
-  # - vim:
-      # name: "vim"
-      # repository: "https://github.com/vim/vim.git"
-      # build:
-        # commands: {}
-        # flags: {}
-        # compiler: ""
 
   # TO BE TESTED
+  # - tcpdump:
+  #    name: "tcpdump"
+  #    repository: "https://github.com/the-tcpdump-group/tcpdump.git"
+  #    build:
+  #      commands: {}
+  #      flags: {}
+  #      compiler: ""
+
+
   #- ffmpeg:
   #    name: "FFmpeg"
   #    repository: "https://github.com/FFmpeg/FFmpeg.git"

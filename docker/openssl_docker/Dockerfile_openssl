@@ -18,23 +18,6 @@ RUN pip3 install --no-cache-dir --break-system-packages -r /app/requirements.txt
 
 # 2. Setup paths
 WORKDIR /app
-#RUN mkdir -p /app/inputs \
-#    && mkdir -p /app/output
-
-# 3. Git fix
-# RUN git config --global --add safe.directory '*'
-
-# 4. Remove default perf wrapper
-# RUN rm -f /usr/bin/perf
-
-# ------------------------------------------------------------------
-# DOWNLOAD RESOURCES
-# ------------------------------------------------------------------
-
-# Download OpenSSL Repo to /app/inputs/openssl
-#RUN git clone https://github.com/openssl/openssl.git /app/inputs/openssl
-
-# ------------------------------------------------------------------
 
 COPY openssl_pipeline.py common.py project.py logger.py config.yaml /app/
 
