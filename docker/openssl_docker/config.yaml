@@ -11,6 +11,14 @@ dataset:
   csv_file: cwe_projects
 
 project:
+  - tcpdump:
+      name: "tcpdump"
+      repository: "https://github.com/the-tcpdump-group/tcpdump.git"
+      build:
+        commands: {}
+        flags: {}
+        compiler: ""
+
   - vim:
       name: "vim"
       repository: "https://github.com/vim/vim.git"

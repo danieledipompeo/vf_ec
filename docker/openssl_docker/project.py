@@ -38,7 +38,8 @@ class ProjectFactory:
             "libarchive": LibarchiveProject,
             "curl": CurlProject,
             "libxml2": LibXML2Project,
-            "imagemagick": ImageMagickProject
+            "imagemagick": ImageMagickProject,
+            "tcpdump": TcpDumpProject
         }
         project_cls = projects.get(name.lower())
         if project_cls is None:
@@ -130,7 +131,8 @@ class Project(ABC):
     
     def _process_coverage_files(self, building_dir: Path) -> list[str]:
         """Process .gcda files and return list of covered files."""
-        gco_files = building_dir.rglob("*.gcda")
+        gco_files = list(building_dir.rglob("*.gcda"))
+        self.logger.debug(f"Found {len(gco_files)} .gcda files in {building_dir}")
         covered = []
         for file in gco_files:
             obj_dir = file.parent
@@ -188,32 +190,7 @@ class Project(ABC):
         _, errorcode, _ = sh(cmd=cmd, cwd=self.input_dir)
         return errorcode == 0
 
-class TcpDumpProject(Project):
-    def __init__(self, output_dir, input_dir) -> None:
-        super().__init__(output_dir, input_dir, "tcpdump", "https://github.com/the-tcpdump-group/tcpdump.git")
-    
-    def get_test_cmd(self, test_name: str, coverage=True) -> list[str]:
-        return ["make", "check", f"TESTS={test_name}"]
-    
-    def get_test(self) -> list[str]:
-        tests_dir = self.input_dir / "tests"
-        test_files = sorted(tests_dir.glob("*.test"))
-        return [t.stem for t in test_files]
 
-    def _configure(self, cwd: Path, coverage=False) -> bool | None:
-        cmd = ["./autogen.sh"]
-        
-        _, rc, err = sh(cmd, cwd=cwd)
-        if rc != 0:
-            self.logger.error(f"Failed to configure tcpdump: {err}")
-            return False
-        
-        cmd = ["./configure"]
-        _, rc, err = sh(cmd, cwd=cwd)
-        if rc != 0:
-            self.logger.error(f"Failed to configure tcpdump: {err}")
-            return False
-        return True
 
 class ImageMagickProject(Project):
     """ImageMagick project using Autotools build system.
@@ -661,6 +638,97 @@ class VimProject(Project):
         
         _, errorcode, _ = sh(cmd=cmd, cwd=self.source_dir)
         return errorcode == 0
+
+
+class TcpDumpProject(Project):
+    """TcpDump project using Autotools build system.
+
+    Simple tests are listed in tests/TESTLIST (one per line, first field is the
+    name) and run individually via ``tests/TESTrun.sh <name>``.  Complex tests
+    are the *.sh scripts in tests/ (excluding the TESTrun.sh / TESTonce
+    harness files that begin with "TEST").
+
+    Coverage is enabled by forwarding ``CFLAGS`` and ``LDFLAGS`` containing
+    ``--coverage`` to ``./configure`` at configuration time.
+    """
+
+    def __init__(self, output_dir, input_dir) -> None:
+        super().__init__(output_dir, input_dir, "tcpdump",
+                         "https://github.com/the-tcpdump-group/tcpdump")
+        # Tests are executed from inside the tests/ sub-directory
+        self.build_dir = self.input_dir
+
+    def coverage_file(self, test_name: str) -> list[str]:
+        return self._process_coverage_files(self.input_dir)
+
+    # ------------------------------------------------------------------
+    # Test discovery
+    # ------------------------------------------------------------------
+
+    def get_test(self) -> list[str]:
+        tests: list[str] = []
+
+        # Simple tests: each non-comment, non-blank line in TESTLIST has the
+        # test name as its first whitespace-separated field.
+        testlist = self.input_dir / "tests" / "TESTLIST"
+        if testlist.exists():
+            for line in testlist.read_text(encoding="utf-8", errors="replace").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                name = line.split()[0]
+                tests.append(name)
+
+        # Complex tests: *.sh scripts excluding the harness files (TEST*.sh).
+        for sh_script in sorted((self.input_dir / "tests").glob("*.sh")):
+            if sh_script.name.startswith("TEST"):
+                continue
+            tests.append(sh_script.stem)
+
+        return tests
+
+    # ------------------------------------------------------------------
+    # Running tests
+    # ------------------------------------------------------------------
+
+    def get_test_cmd(self, test_name: str, coverage=True) -> list[str]:
+        # TESTrun.sh accepts an optional single argument to run one test.
+        return ["./TESTrun.sh", test_name]
+
+    def _run(self, cmd: list[str]) -> tuple[bool, dict]:
+        stdout, errorcode, stderr = sh(cmd, cwd=self.input_dir / "tests")
+        if errorcode != 0:
+            self.logger.error(f"Test output:\n{stdout}\n{stderr}")
+        return errorcode == 0, {"stdout": stdout, "stderr": stderr, "errorcode": errorcode}
+
+    def _get_test_dir_for_energy(self) -> Path:
+        return self.input_dir / "tests"
+
+    # ------------------------------------------------------------------
+    # Build system
+    # ------------------------------------------------------------------
+
+    def _configure(self, cwd: Path, coverage=False) -> bool:
+        cmd = ["./configure"]
+        if coverage:
+            cmd = [
+                'CFLAGS="-g -O0 -fprofile-arcs -ftest-coverage"',
+                'LDFLAGS="-fprofile-arcs -ftest-coverage"',
+                "./configure",
+            ]
+        _, errorcode, _ = sh(cmd, cwd=cwd)
+        return errorcode == 0
+
+    def _build(self, n_proc=-1, coverage=False) -> bool:
+        cmd = ["make"]
+        if n_proc == -1:
+            nproc = os.cpu_count() or 1
+            cmd.append(f"-j{nproc}")
+        else:
+            cmd.append(f"-j{n_proc}")
+        _, errorcode, _ = sh(cmd=cmd, cwd=self.input_dir)
+        return errorcode == 0
+
 #        
 #        self._init(output_dir, input_dir, "FFmpeg","https://github.com/FFmpeg/FFmpeg.git")
 #        
