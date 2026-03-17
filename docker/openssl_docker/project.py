@@ -1,6 +1,7 @@
 # create an abstract class for projects
 from abc import ABC, abstractmethod
 from glob import glob
+import json
 import os
 from pathlib import Path
 import re
@@ -36,10 +37,12 @@ class ProjectFactory:
             "openssl": OpenSSLProject,
             "vim": VimProject,
             "libarchive": LibarchiveProject,
+            "jasper": JasperProject,
             "curl": CurlProject,
             "libxml2": LibXML2Project,
             "imagemagick": ImageMagickProject,
-            "tcpdump": TcpDumpProject
+            "tcpdump": TcpDumpProject,
+            "qemu": QEMUProject,
         }
         project_cls = projects.get(name.lower())
         if project_cls is None:
@@ -474,6 +477,149 @@ class LibarchiveProject(Project):
             return self._build_cmake(n_proc)
         return super()._build(n_proc=n_proc, coverage=coverage)
 
+class JasperProject(Project):
+    """Jasper project using CMake with CTest-based test discovery.
+
+    The upstream project defines its regression tests through CTest in the
+    out-of-tree build directory. Coverage is enabled by passing compiler and
+    linker coverage flags during CMake configuration.
+    """
+
+    def __init__(self, output_dir, input_dir) -> None:
+        super().__init__(output_dir, input_dir, "jasper", "https://github.com/jasper-software/jasper.git")
+        # Jasper rejects in-source builds, and pipeline cleanup runs under
+        # project.output_dir. Keep build artifacts outside both source and
+        # output trees so .gcno files are preserved between test runs.
+        workspace_root = self.output_dir.parent.parent
+        self.build_dir = workspace_root / "build" / self.name / CMAKE_BUILD_DIR
+        self.build_dir.mkdir(parents=True, exist_ok=True)
+
+    def get_test_cmd(self, test_name: str, coverage=True) -> list[str]:
+        return ["ctest", "-R", f"^{test_name}$", "--output-on-failure"]
+
+    def _cmake_cache_flag(self, name: str, default: bool = False) -> bool:
+        cache = self.build_dir / "CMakeCache.txt"
+        if not cache.exists():
+            return default
+
+        for line in cache.read_text(encoding="utf-8", errors="replace").splitlines():
+            if not line.startswith(f"{name}:"):
+                continue
+            try:
+                value = line.split("=", 1)[1].strip().upper()
+            except IndexError:
+                return default
+            return value in {"1", "ON", "TRUE", "YES"}
+
+        return default
+
+    def get_test(self) -> list[str]:
+        tests = self._get_ctest_tests(self.build_dir)
+
+        # Some Jasper tests require JPEG codec support. If libjpeg is not
+        # available in the current environment, these tests fail even though
+        # source test data paths are valid.
+        jpeg_enabled = (
+            self._cmake_cache_flag("JAS_HAVE_LIBJPEG", default=False)
+            and self._cmake_cache_flag("JAS_INCLUDE_JPG_CODEC", default=False)
+            and self._cmake_cache_flag("JAS_ENABLE_JPG_CODEC", default=False)
+        )
+
+        if not jpeg_enabled:
+            jpeg_tests = {"run_test_2"}
+            filtered = [t for t in tests if t not in jpeg_tests]
+            dropped = sorted(set(tests) - set(filtered))
+            if dropped:
+                self.logger.warning(
+                    "Skipping JPEG-dependent Jasper tests because JPEG codec is unavailable: %s",
+                    ", ".join(dropped),
+                )
+            tests = filtered
+
+        return tests
+
+    def _process_coverage_files(self, building_dir: Path) -> list[str]:
+        """Collect coverage files for Jasper from its out-of-source build dir.
+
+        Jasper often leaves stale .gcda files when binaries are rebuilt. We
+        skip those artifacts instead of failing the whole coverage pass.
+        """
+        gco_files = list(building_dir.rglob("*.gcda"))
+        self.logger.debug(f"Found {len(gco_files)} .gcda files in {building_dir}")
+        covered: list[str] = []
+
+        for gcda in gco_files:
+            obj_dir = gcda.parent
+            gcno = gcda.with_suffix(".gcno")
+            if not gcno.exists():
+                self.logger.warning(f"Skipping {gcda}: missing matching {gcno.name}")
+                continue
+
+            gcov_target = str(gcda.with_suffix(""))
+            stdout, code, stderr = sh(
+                ["gcov", "-n", "-o", str(obj_dir), gcov_target],
+                cwd=obj_dir,
+            )
+
+            if code != 0:
+                stderr_l = stderr.lower()
+                if "stamp mismatch" in stderr_l or "cannot open notes file" in stderr_l:
+                    # Remove stale runtime data so later passes are cleaner.
+                    try:
+                        gcda.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+                    self.logger.warning(f"Skipping stale coverage artifact {gcda}: {stderr.strip()}")
+                else:
+                    self.logger.error(f"gcov failed for {gcda} with error: {stderr}")
+                continue
+
+            covered_file = self._extract_covered_file(stdout, obj_dir)
+            if covered_file:
+                try:
+                    covered.append(str(Path(covered_file).relative_to(self.input_dir)))
+                except ValueError:
+                    covered.append(str(Path(covered_file)))
+
+        # Keep deterministic output and avoid duplicates.
+        return sorted(set(covered))
+
+    def _configure(self, cwd: Path, coverage=False) -> bool:
+        cmd = [
+            "cmake", "-S", str(self.input_dir), "-B", str(self.build_dir),
+            "-DCMAKE_BUILD_TYPE=Debug",
+            "-DJAS_ENABLE_DOC=OFF",
+            "-DJAS_ENABLE_OPENGL=OFF",
+            "-DJAS_ENABLE_LIBHEIF=OFF",
+            "-DJAS_ENABLE_LIBJPEG=ON",
+            "-DJAS_INCLUDE_JPG_CODEC=ON",
+            "-DJAS_ENABLE_JPG_CODEC=ON",
+            "-DJAS_ENABLE_SHARED=OFF",
+            "-DJAS_ENABLE_PROGRAMS=ON",
+            "-DJAS_ENABLE_CONFORMANCE_TESTS=OFF",
+        ]
+
+        if coverage:
+            cmd += [
+                '-DCMAKE_C_FLAGS="-g -O0 --coverage"',
+                '-DCMAKE_EXE_LINKER_FLAGS="--coverage"',
+                '-DCMAKE_STATIC_LINKER_FLAGS=""',
+            ]
+
+        _, errorcode, _ = sh(cmd, cwd=cwd)
+        return errorcode == 0
+
+    def _build(self, n_proc=-1, coverage=False):
+        cmd = ["cmake", "--build", str(self.build_dir)]
+        if n_proc == -1:
+            nproc = os.cpu_count() or 1
+            cmd.append(f"-j{nproc}")
+        elif n_proc > 1:
+            cmd.append(f"-j{n_proc}")
+
+        _, errorcode, _ = sh(cmd=cmd, cwd=self.input_dir)
+        return errorcode == 0
+
 
 class OpenSSLProject(Project):
     """OpenSSL project using custom Make-based build system.
@@ -727,6 +873,156 @@ class TcpDumpProject(Project):
         else:
             cmd.append(f"-j{n_proc}")
         _, errorcode, _ = sh(cmd=cmd, cwd=self.input_dir)
+        return errorcode == 0
+
+
+class QEMUProject(Project):
+    """QEMU project using configure+Meson with per-test coverage support.
+
+    Build is done out-of-tree. Test discovery uses Meson introspection when
+    available, and falls back to ``make check-help`` suite targets.
+    """
+
+    BUILD_DIR_NAME = "meson_build"
+
+    def __init__(self, output_dir, input_dir) -> None:
+        super().__init__(output_dir, input_dir, "qemu", "https://gitlab.com/qemu-project/qemu.git")
+        workspace_root = self.output_dir.parent.parent
+        self.build_dir = workspace_root / "build" / self.name / QEMUProject.BUILD_DIR_NAME
+        self.build_dir.mkdir(parents=True, exist_ok=True)
+
+    def _meson_executable(self) -> str | None:
+        """Return path to meson if available in the build venv, else None."""
+        local_meson = self.build_dir / "pyvenv" / "bin" / "meson"
+        if local_meson.exists():
+            return str(local_meson)
+        # Do not fall back to a bare 'meson' that may not be installed;
+        # old QEMU commits pre-date Meson and rely on plain make.
+        return None
+
+    def _run(self, cmd: list[str]) -> tuple[bool, dict]:
+        stdout, errorcode, stderr = sh(cmd, cwd=self.build_dir)
+        if errorcode != 0:
+            self.logger.error(f"Test output:\n{stdout}\n{stderr}")
+        return errorcode == 0, {"stdout": stdout, "stderr": stderr, "errorcode": errorcode}
+
+    def run_test(self, test_name: str, coverage=True) -> tuple[bool, dict]:
+        # QEMU's own target clears prior *.gcda state and is the recommended
+        # way to prepare for single-test coverage runs.
+        if coverage:
+            sh(["make", "clean-gcda"], cwd=self.build_dir)
+        # For make-based builds the individual test binaries are not compiled
+        # during the main build step; build the specific binary on demand.
+        if self._meson_executable() is None:
+            test_bin = self.build_dir / "tests" / test_name
+            if not test_bin.exists():
+                _, rc, _ = sh(["make", f"tests/{test_name}"], cwd=self.build_dir)
+                if rc != 0:
+                    self.logger.error(f"Failed to build QEMU test binary: tests/{test_name}")
+                    return False, {"errorcode": rc}
+        return super().run_test(test_name, coverage=coverage)
+
+    def coverage_file(self, test_name: str) -> list[str]:
+        return self._process_coverage_files(self.build_dir)
+
+    def get_test_cmd(self, test_name: str, coverage=True) -> list[str]:
+        meson = self._meson_executable()
+        if meson is not None:
+            return [meson, "test", "--no-rebuild", "--print-errorlogs", test_name]
+        # Old make-based build: run the test binary directly. The binary is
+        # ensured to exist by run_test() before this command is executed.
+        return [str(self.build_dir / "tests" / test_name)]
+
+    def _get_make_unit_tests(self) -> list[str]:
+        """Parse tests/Makefile from source tree to extract unit-test binary names."""
+        makefile = self.input_dir / "tests" / "Makefile"
+        if not makefile.exists():
+            return []
+        tests: list[str] = []
+        for line in makefile.read_text(encoding="utf-8", errors="replace").splitlines():
+            # matches: check-unit-y = tests/check-qdict$(EXESUF)
+            #          check-unit-y += tests/test-coroutine$(EXESUF)
+            m = re.match(r'check-unit-[\w$()]+\s*[+:]?=\s*tests/([^$(\s]+)', line)
+            if m:
+                tests.append(m.group(1))
+        return tests
+
+    def get_test(self) -> list[str]:
+        meson = self._meson_executable()
+        if meson is not None:
+            stdout, code, _ = sh([meson, "introspect", "--tests"], cwd=self.build_dir)
+            if code == 0:
+                try:
+                    tests_data = json.loads(stdout)
+                    tests = [entry.get("name", "").strip() for entry in tests_data if isinstance(entry, dict)]
+                    tests = [t for t in tests if t]
+                    if tests:
+                        return sorted(set(tests))
+                except json.JSONDecodeError:
+                    self.logger.warning("Failed to parse Meson introspection output for QEMU tests.")
+
+        # Old make-based build: discover individual unit-test binaries from
+        # tests/Makefile in the source tree. Binaries are compiled on-demand
+        # at test-run time, so no existence check is applied here.
+        self.logger.info("Using tests/Makefile for individual QEMU unit-test discovery.")
+        unit_tests = self._get_make_unit_tests()
+        if unit_tests:
+            return sorted(set(unit_tests))
+
+        # Last resort: coarse suite targets via make check-help.
+        self.logger.info("Falling back to make check-help for QEMU test discovery.")
+        out, code, _ = sh(["make", "check-help"], cwd=self.build_dir)
+        if code != 0:
+            return []
+        suites: list[str] = []
+        for line in out.splitlines():
+            line = line.strip()
+            if not line.startswith("check-"):
+                continue
+            suites.append(line.split()[0])
+        return sorted(set(suites))
+
+    def _configure(self, cwd: Path, coverage=False) -> bool:
+        # Remove any in-tree build artifacts that would prevent an out-of-tree build.
+        # QEMU's Makefile aborts if config.mak / platform dirs exist in the source tree.
+        sh(["make", "distclean"], cwd=self.input_dir)  # ignore errors; may not exist
+        sh(["bash", "-c", "rm -rf *-linux-user *-softmmu"], cwd=self.input_dir)
+
+        configure_script = self.input_dir / "configure"
+        cmd = [
+            str(configure_script),
+            "--disable-werror",
+            "--disable-docs",
+            "--disable-tools",
+            "--disable-guest-agent",
+            "--disable-xen",
+            "--disable-xen-pci-passthrough",
+            "--disable-gtk",
+            "--disable-sdl",
+            "--disable-opengl",
+            "--disable-cocoa",
+            "--disable-spice",
+            "--enable-debug",
+            "--target-list=x86_64-softmmu",
+            "--extra-cflags=-Wno-error=nested-externs",
+            "--python=/usr/local/bin/python2.4"
+        ]
+
+        if coverage:
+            cmd.append("--enable-gcov")
+
+        _, errorcode, _ = sh(cmd, cwd=self.build_dir)
+        return errorcode == 0
+
+    def _build(self, n_proc=-1, coverage=False) -> bool:
+        cmd = ["make"]
+        if n_proc == -1:
+            nproc = os.cpu_count() or 1
+            cmd.append(f"-j{nproc}")
+        else:
+            cmd.append(f"-j{n_proc}")
+
+        _, errorcode, _ = sh(cmd=cmd, cwd=self.build_dir)
         return errorcode == 0
 
 #        

@@ -11,13 +11,22 @@ dataset:
   csv_file: cwe_projects
 
 project:
-  - tcpdump:
-      name: "tcpdump"
-      repository: "https://github.com/the-tcpdump-group/tcpdump.git"
+
+  - qemu:
+      name: "qemu"
+      repository: "https://gitlab.com/qemu-project/qemu.git"
       build:
         commands: {}
         flags: {}
         compiler: ""
+  
+  #- tcpdump:
+  #    name: "tcpdump"
+  #    repository: "https://github.com/the-tcpdump-group/tcpdump.git"
+  #    build:
+  #      commands: {}
+  #      flags: {}
+  #      compiler: ""
 
   #- vim:
   #    name: "vim"
@@ -27,13 +36,6 @@ project:
   #      flags: {}
   #      compiler: ""
 
-  #- ImageMagick:
-  #    name: "ImageMagick"
-  #    repository: "https://github.com/ImageMagick/ImageMagick"
-  #    build:
-  #      commands: {}
-  #      flags: {}
-  #      compiler: ""
 
   #- libxml2:
   #    name: "libxml2"
@@ -42,6 +44,26 @@ project:
   #      commands: {}
   #      flags: {}
   #      compiler: ""
+
+  ## NO COVERAGE DATA START
+
+  #- ImageMagick:
+  #    name: "ImageMagick"
+  #    repository: "https://github.com/ImageMagick/ImageMagick"
+  #    build:
+  #      commands: {}
+  #      flags: {}
+  #      compiler: ""
+  
+  #- jasper:
+  #    name: "jasper"
+  #    repository: "https://github.com/jasper-software/jasper.git"
+  #    build:
+  #      commands: {}
+  #      flags: {}
+  #      compiler: ""
+  
+  ## NO COVERAGE DATA END
 
   #- curl:
   #    name: "curl"
