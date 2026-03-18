@@ -43,6 +43,7 @@ class ProjectFactory:
             "imagemagick": ImageMagickProject,
             "tcpdump": TcpDumpProject,
             "qemu": QEMUProject,
+            "ffmpeg": FFmpegProject,
         }
         project_cls = projects.get(name.lower())
         if project_cls is None:
@@ -117,17 +118,38 @@ class Project(ABC):
         return errorcode == 0
 
     def _resolve_source_path(self, reported_file: str, objdir: Path) -> Path:
-        p = Path(reported_file)
+        reported = reported_file.strip().strip("'\"")
+        p = Path(reported)
         if p.is_absolute():
             return p
-        return (objdir / p).resolve()
 
-    def _extract_covered_file(self, stdout: str, obj_dir: Path) -> str | None:
+        # Most projects: gcov reports paths relative to object dir.
+        objdir_candidate = (objdir / p).resolve()
+        if objdir_candidate.exists():
+            return objdir_candidate
+
+        # Some builds report paths relative to source root.
+        source_candidate = (self.input_dir / p).resolve()
+        if source_candidate.exists():
+            return source_candidate
+
+        # QEMU/legacy gcov can emit absolute-like paths without a leading '/'.
+        # Example: app/inputs/qemu/..., which would otherwise duplicate objdir.
+        abs_like = Path("/" + reported.lstrip("/"))
+        if abs_like.exists():
+            return abs_like.resolve()
+
+        # Fallback keeps previous behavior for unknown layouts.
+        return objdir_candidate
+
+    def _extract_covered_file(self, stdout: str, obj_dir: Path) -> list[str] | None:
+        covered_files = []
         for line in stdout.splitlines():
             if line.startswith("File"):
                 source_file = line.split("File ",1)[-1].replace("'", "")
                 real_path = self._resolve_source_path(source_file, obj_dir)
-                return str(real_path)
+                covered_files.append(str(real_path))
+        return covered_files if covered_files else None
 
     def coverage_file(self, test_name: str) -> list[str]:
         return self._process_coverage_files(Path(self.build_dir))
@@ -144,10 +166,17 @@ class Project(ABC):
                 self.logger.error(f"gcov failed for {file} with error: {stderr}")
                 continue
             
-            covered_file = self._extract_covered_file(stdout, obj_dir)
-            if covered_file:
-                covered_file = str(Path(covered_file).relative_to(self.input_dir))
-                covered.append(covered_file)
+            covered_files = self._extract_covered_file(stdout, obj_dir)
+            if covered_files:
+                for covered_file in covered_files:
+                    covered_path = Path(covered_file)
+                    try:
+                        covered.append(str(covered_path.relative_to(self.input_dir)))
+                    except ValueError:
+                        self.logger.debug(
+                            "Skipping generated coverage file outside source tree: %s",
+                            covered_path,
+                        )
                 
         return covered
 
@@ -574,12 +603,13 @@ class JasperProject(Project):
                     self.logger.error(f"gcov failed for {gcda} with error: {stderr}")
                 continue
 
-            covered_file = self._extract_covered_file(stdout, obj_dir)
-            if covered_file:
-                try:
-                    covered.append(str(Path(covered_file).relative_to(self.input_dir)))
-                except ValueError:
-                    covered.append(str(Path(covered_file)))
+            covered_files = self._extract_covered_file(stdout, obj_dir)
+            if covered_files:
+                for covered_file in covered_files:
+                    try:
+                        covered.append(str(Path(covered_file).relative_to(self.input_dir)))
+                    except ValueError:
+                        covered.append(str(Path(covered_file)))
 
         # Keep deterministic output and avoid duplicates.
         return sorted(set(covered))
@@ -721,10 +751,11 @@ class VimProject(Project):
                 self.logger.error(f"gcov failed for {file} with error: {stderr}")
                 continue
             
-            covered_file = self._extract_covered_file(stdout, obj_dir)
-            if covered_file:
-                covered_file = str(Path(VimProject.SOURCE_DIR) / Path(covered_file).relative_to(obj_dir))
-                covered.append(covered_file)
+            covered_files = self._extract_covered_file(stdout, obj_dir)
+            if covered_files:
+                for covered_file in covered_files:
+                    covered_file = str(Path(VimProject.SOURCE_DIR) / Path(covered_file).relative_to(obj_dir))
+                    covered.append(covered_file)
                 
         return covered
 
@@ -875,21 +906,18 @@ class TcpDumpProject(Project):
         _, errorcode, _ = sh(cmd=cmd, cwd=self.input_dir)
         return errorcode == 0
 
-
+# TODO: check why it doesn't create energy data
 class QEMUProject(Project):
     """QEMU project using configure+Meson with per-test coverage support.
 
-    Build is done out-of-tree. Test discovery uses Meson introspection when
-    available, and falls back to ``make check-help`` suite targets.
+    Build is done in-tree so generated sources, test binaries, and coverage
+    artifacts stay alongside the checked-out revision. Test discovery uses
+    Meson introspection when available, and falls back to legacy make rules.
     """
-
-    BUILD_DIR_NAME = "meson_build"
 
     def __init__(self, output_dir, input_dir) -> None:
         super().__init__(output_dir, input_dir, "qemu", "https://gitlab.com/qemu-project/qemu.git")
-        workspace_root = self.output_dir.parent.parent
-        self.build_dir = workspace_root / "build" / self.name / QEMUProject.BUILD_DIR_NAME
-        self.build_dir.mkdir(parents=True, exist_ok=True)
+        self.build_dir = self.input_dir
 
     def _meson_executable(self) -> str | None:
         """Return path to meson if available in the build venv, else None."""
@@ -900,11 +928,54 @@ class QEMUProject(Project):
         # old QEMU commits pre-date Meson and rely on plain make.
         return None
 
-    def _run(self, cmd: list[str]) -> tuple[bool, dict]:
-        stdout, errorcode, stderr = sh(cmd, cwd=self.build_dir)
-        if errorcode != 0:
-            self.logger.error(f"Test output:\n{stdout}\n{stderr}")
-        return errorcode == 0, {"stdout": stdout, "stderr": stderr, "errorcode": errorcode}
+    def _run_configure_with_fallback(self, configure_script: Path, options: list[str]) -> tuple[bool, str]:
+        """Run configure, dropping only options explicitly reported as unknown."""
+        pending = list(options)
+        unknown_patterns = [
+            re.compile(r"unknown option\s+(--[^\s]+)", re.IGNORECASE),
+            re.compile(r"unrecognized option\s+['\"]?(--[^\s'\"]+)['\"]?", re.IGNORECASE),
+            re.compile(r"option\s+['\"]?(--[^\s'\"]+)['\"]?\s+not recognized", re.IGNORECASE),
+        ]
+
+        for _ in range(len(options) + 1):
+            cmd = [str(configure_script)] + pending
+            stdout, errorcode, stderr = sh(cmd, cwd=self.build_dir)
+            combined = f"{stdout}\n{stderr}"
+            if errorcode == 0:
+                self.logger.debug("QEMU configure options selected: %s", " ".join(pending))
+                return True, combined
+
+            match = None
+            for pattern in unknown_patterns:
+                match = pattern.search(combined)
+                if match:
+                    break
+            if not match:
+                self.logger.error("QEMU configure failed without unknown-option hint:\n%s", combined)
+                return False, combined
+
+            unknown = match.group(1).strip("'\".,:;)")
+            new_pending = [o for o in pending if o.split("=", 1)[0] != unknown]
+            if len(new_pending) == len(pending):
+                self.logger.error("QEMU configure reported unknown option %s, but it was not in pending options", unknown)
+                return False, combined
+            self.logger.warning("QEMU configure does not support %s; retrying without it", unknown)
+            pending = new_pending
+
+        return False, ""
+
+    def _python_candidates(self) -> list[str]:
+        candidates = [
+            "/usr/bin/python3",
+            "/usr/local/bin/python2.7"
+        ]
+        return [p for p in candidates if Path(p).exists()]
+
+    def _is_python_config_error(self, configure_output: str) -> bool:
+        out = configure_output.lower()
+        return "python" in out and (
+            "is required" in out or "cannot use" in out or "not found" in out or "unsupported" in out
+        )
 
     def run_test(self, test_name: str, coverage=True) -> tuple[bool, dict]:
         # QEMU's own target clears prior *.gcda state and is the recommended
@@ -916,10 +987,10 @@ class QEMUProject(Project):
         if self._meson_executable() is None:
             test_bin = self.build_dir / "tests" / test_name
             if not test_bin.exists():
-                _, rc, _ = sh(["make", f"tests/{test_name}"], cwd=self.build_dir)
+                out, rc, err = sh(["make", f"tests/{test_name}"], cwd=self.build_dir)
                 if rc != 0:
-                    self.logger.error(f"Failed to build QEMU test binary: tests/{test_name}")
-                    return False, {"errorcode": rc}
+                    return False, {"errorcode": rc, "stdout": out, "stderr": err}
+
         return super().run_test(test_name, coverage=coverage)
 
     def coverage_file(self, test_name: str) -> list[str]:
@@ -929,9 +1000,8 @@ class QEMUProject(Project):
         meson = self._meson_executable()
         if meson is not None:
             return [meson, "test", "--no-rebuild", "--print-errorlogs", test_name]
-        # Old make-based build: run the test binary directly. The binary is
-        # ensured to exist by run_test() before this command is executed.
-        return [str(self.build_dir / "tests" / test_name)]
+        # Old make-based build: execute the test via make target.
+        return ["make", str(Path("tests") / test_name)]
 
     def _get_make_unit_tests(self) -> list[str]:
         """Parse tests/Makefile from source tree to extract unit-test binary names."""
@@ -983,14 +1053,14 @@ class QEMUProject(Project):
         return sorted(set(suites))
 
     def _configure(self, cwd: Path, coverage=False) -> bool:
-        # Remove any in-tree build artifacts that would prevent an out-of-tree build.
-        # QEMU's Makefile aborts if config.mak / platform dirs exist in the source tree.
-        sh(["make", "distclean"], cwd=self.input_dir)  # ignore errors; may not exist
-        sh(["bash", "-c", "rm -rf *-linux-user *-softmmu"], cwd=self.input_dir)
-
         configure_script = self.input_dir / "configure"
-        cmd = [
-            str(configure_script),
+
+        # Keep Meson/configure state clean between commits in in-tree mode.
+        # Stale build dirs can make configure fail before option fallback helps.
+        sh(["make", "distclean"], cwd=self.input_dir)
+        sh(["rm", "-rf", "build"], cwd=self.input_dir)
+
+        base_options = [
             "--disable-werror",
             "--disable-docs",
             "--disable-tools",
@@ -1005,247 +1075,122 @@ class QEMUProject(Project):
             "--enable-debug",
             "--target-list=x86_64-softmmu",
             "--extra-cflags=-Wno-error=nested-externs",
-            "--python=/usr/local/bin/python2.4"
         ]
 
         if coverage:
-            cmd.append("--enable-gcov")
+            base_options.append("--enable-gcov")
 
-        _, errorcode, _ = sh(cmd, cwd=self.build_dir)
+        last_output = ""
+        for python_exec in self._python_candidates():
+            options = list(base_options)
+            options.append(f"--python={python_exec}")
+            ok, output = self._run_configure_with_fallback(configure_script, options)
+            if ok:
+                return True
+            last_output = output
+            if not self._is_python_config_error(output):
+                return False
+            self.logger.warning("QEMU configure rejected Python interpreter %s; trying next candidate", python_exec)
+
+        # Fallback: if no explicit interpreter works, let configure pick from PATH.
+        ok, output = self._run_configure_with_fallback(configure_script, list(base_options))
+        if ok:
+            return True
+        if output:
+            self.logger.error("QEMU configure failed after Python fallback attempts:\n%s", output)
+        elif last_output:
+            self.logger.error("QEMU configure failed after Python fallback attempts:\n%s", last_output)
+        return False
+    
+    def _get_test_dir_for_energy(self) -> Path:
+        """Override to customize test directory for energy measurement."""
+        return self.build_dir
+
+
+class FFmpegProject(Project):
+    """FFmpeg project using its own configure script with the FATE test suite.
+
+    Configuration uses ./configure with --toolchain=gcov for coverage instrumentation.
+    Tests are FATE tests discovered via 'make fate-list' (requires a configured build).
+    Individual tests are run via 'make <test-name>' from the source/build directory.
+    Coverage files (.gcda) are collected from the in-source tree after each test run.
+    """
+
+    def __init__(self, output_dir, input_dir) -> None:
+        super().__init__(output_dir, input_dir, "FFmpeg", "https://git.ffmpeg.org/ffmpeg.git")
+        # FFmpeg performs in-source builds; tests run from the top-level source dir.
+        self.build_dir = self.input_dir
+
+    # ------------------------------------------------------------------
+    # Configuration
+    # ------------------------------------------------------------------
+
+    def _configure(self, cwd: Path, coverage=False) -> bool:
+        cmd = [
+            "./configure",
+            "--disable-doc",
+            "--disable-htmlpages",
+            "--disable-manpages",
+            "--disable-podpages",
+            "--disable-txtpages",
+            "--disable-optimizations",
+            "--disable-stripping",
+            "--enable-debug=3",
+            "--disable-x86asm"
+        ]
+        if coverage:
+            # --toolchain=gcov adds -fprofile-arcs -ftest-coverage to CFLAGS/LDFLAGS
+            cmd.append("--toolchain=gcov")
+
+        _, errorcode, _ = sh(cmd, cwd=cwd)
         return errorcode == 0
+
+    # ------------------------------------------------------------------
+    # Build
+    # ------------------------------------------------------------------
 
     def _build(self, n_proc=-1, coverage=False) -> bool:
-        cmd = ["make"]
-        if n_proc == -1:
-            nproc = os.cpu_count() or 1
-            cmd.append(f"-j{nproc}")
-        else:
-            cmd.append(f"-j{n_proc}")
+        # Build main executable using parent class implementation
+        if not super()._build(n_proc=n_proc, coverage=coverage):
+            return False
 
-        _, errorcode, _ = sh(cmd=cmd, cwd=self.build_dir)
+        # Build the FATE helper binaries (videogen, audiogen, …)
+        _, errorcode, _ = sh(["make", "testprogs"], cwd=self.input_dir)
         return errorcode == 0
 
-#        
-#        self._init(output_dir, input_dir, "FFmpeg","https://github.com/FFmpeg/FFmpeg.git")
-#        
-#        samples_dir = os.path.join(output_dir, self.name, "fate_suite")
-#        if not os.path.exists(samples_dir) or not os.listdir(samples_dir):
-#            self.logger.info("FATE Samples not found. Downloading ...")
-#            try:
-#                # Create dir
-#                os.makedirs(samples_dir, exist_ok=True)
-#                # Standard FFmpeg FATE rsync command
-#                cmd = ["rsync", "-aL", "rsync://fate-suite.ffmpeg.org/fate-suite/", f"{samples_dir}/"]
-#                sh(cmd, input_dir)
-#                self.logger.info("FATE Samples download complete.")
-#            except Exception as e:
-#                self.logger.error(f"Failed to download FATE samples: {e}")
-#                sys.exit(1)
-#
-#    def get_test_cmd(self, test_name: str, coverage=False) -> list[str]:
-#        return ["make", test_name, "HARNESS_JOBS=1"]
-#
-#    def get_test(self) -> list[str]:
-#        out, _, _ = sh(['make', '-s', 'fate-list'], cwd=Path(self.input_dir))
-#        return [line.strip().split()[0]
-#            for line in out.splitlines()
-#            if line.strip() and not line.lstrip().startswith(("make", "Files=", "Tests=", "Result:", "GEN"))]
-#    
-#    def _configure(self, cwd, coverage=False) -> bool:
-#        config_args = ["./configure", "--disable-asm", "--disable-doc"]
-#        if coverage:
-#            config_args.append("--extra-cflags=--coverage")
-#            config_args.append("--extra-ldflags=--coverage")
-#        _, errorcode, err = sh(config_args, cwd=cwd)
-#        if errorcode != 0:
-#            self.logger.error(f"Configuration failed with error: {err}")
-#            return False
-#        
-#        self.logger.info("Configuration succeeded with standard ./config.")
-#        return True
-#    
-#    def compute_energy(self, test_name: str, commit: str):
-#        os.makedirs(os.path.join(self.output_dir, "energy_measurements"), exist_ok=True)
-#        cmd = self.get_test_cmd(test_name, coverage=False)
-#        out_filename = os.path.join(self.output_dir, "energy_measurements", f"{commit}__{test_name}_energy")
-#
-#        EnergyHandler.measure_test(test_name, cmd=cmd,
-#                                   output_filename=out_filename,
-#                                   test_dir=self.build_dir) 
-    
-# class LibRawProject(Project):
-    
-#     raw_sample: str
-#     def __init__(self, output_dir, input_dir):            
-#         super().__init__()
-        
-#         self._init(output_dir, input_dir, "libraw","https://github.com/LibRaw/LibRaw.git")
-#         self.raw_sample = os.path.join(self.input_dir, "sample.cr2")
+    # ------------------------------------------------------------------
+    # Test discovery
+    # ------------------------------------------------------------------
 
-#     def get_test_cmd(self, test_name: str) -> list[str]:
-#         return ["make", test_name, "HARNESS_JOBS=1"]
-    
-#     def get_test(self):
-#         return sh(['raw-identify', self.raw_sample], cwd=Path('./bin'))
-    
-# class LibVNCServerProject(Project):
-# 
-    # def __init__(self, output_dir, input_dir) -> None:
-        # super().__init__()
-        # 
-        # self._init(output_dir, input_dir, "libvncserver", "https://github.com/LibVNC/libvncserver")
-        # 
-        # sh(["git", "submodule", "update", "--init", "--recursive"], cwd=Path(self.input_dir))
-        # self.test_dir = os.path.join(self.input_dir, CMAKE_BUILD_DIR)
-    # 
-    # def get_test_cmd(self, test_name: str) -> list[str]:
-        # return ["ctest", "-R", f"^{test_name}$", "--output-on-failure"]
-    # 
-    # def _run(self, cmd: list[str], env_test: dict, cwd: Path) -> tuple[bool, Exception | None]:
-        # try:
-            # _, errorcode, _ = sh(cmd, cwd=Path(self.test_dir), env=env_test)
-            # return errorcode == 0, None
-        # except Exception as e:
-            # self.logger.error(f"Test '{test_name}' failed with exception: {e}")
-            # return False, e
-        # 
-    # def get_test(self) -> list[str]:
-        # tests = []
-# 
-        # CMake logic
-        # build_dir = os.path.join(self.input_dir, CMAKE_BUILD_DIR)
-        # if os.path.exists(build_dir):
-            # stdout, returncode, stderr = sh(["ctest", "-N"], cwd=Path(build_dir))
-            # for line in stdout.splitlines():
-                # if "Test #" in line:
-                    # parts = line.split(":")
-                    # if len(parts) >= 2:
-                        # tests.append(parts[1].strip())
-        # Autotools logic
-        # else:
-            # TODO fix during the debugging session
-            # pass
-        # return tests
-    # 
-    # def _build(self, n_proc=-1):
-        # import os
-        # if os.path.exists(os.path.join(self.input_dir, CMAKE_BUILD_DIR)):
-            # cmd = ["cmake", "--build", CMAKE_BUILD_DIR]
-        # else:
-            # cmd = ["make"]
-            # 
-        # if n_proc == -1:
-            # import os
-            # nproc = os.cpu_count() or 1
-            # cmd.append(f"-j{nproc}")
-        # else:
-            # cmd.append(f"-j{n_proc}")
-        # 
-        # _, errorcode, _ = sh(cmd=cmd, cwd=Path(self.input_dir))
-        # return errorcode == 0
-        # 
-    # def _configure(self, cwd: Path, coverage=False) -> bool:
-        # flags = "-O0"
-        # libs = ""
-        # 
-        # if coverage:
-            # flags += " --coverage"
-            # libs = "-lgcov" 
-        # 
-        # [NEW] Hybrid build logic. LibVNCServer switched from Autotools to CMake over time.
-        # if os.path.exists(os.path.join(cwd, "CMakeLists.txt")):
-            # logger.info("Detected CMake build system.")
-            # cmake_cmd = [
-                # 'cmake', '-B', CMAKE_BUILD_DIR, '-S', '.',
-                # f'-DCMAKE_C_FLAGS="{flags}"',
-                # f'-DCMAKE_EXE_LINKER_FLAGS="{libs}"',
-                # '-DBUILD_TESTS=ON'
-            # ]
-            # stdout, returncode, stderr = sh(cmake_cmd, cwd=Path(cwd))
-        # else:
-            # logger.info("Detected Legacy Autotools build system.")
-            # if not os.path.exists(os.path.join(cwd, "configure")):
-                # sh(["autogen.sh"], cwd=Path(cwd))
-            # 
-            # env_test = os.environ.copy()
-            # env_test["CFLAGS"] = flags
-            # env_test["LDFLAGS"] = flags
-            # env_test["LIBS"] = libs
-                        # 
-            # full_cmd = ['./configure', '--enable-static']
-            # _, returncode, _ = sh(full_cmd, cwd=Path(cwd), env=env_test)
-        # return returncode == 0
+    def get_test(self) -> list[str]:
+        """Return all FATE test names via 'make fate-list' (needs a configured build)."""
+        stdout, code, _ = sh(["make", "fate-list"], cwd=self.input_dir)
+        if code != 0:
+            self.logger.error("'make fate-list' failed; has the project been built?")
+            return []
+        return [line.strip() for line in stdout.splitlines() if line.strip().startswith("fate-")]
 
+    # ------------------------------------------------------------------
+    # Running tests
+    # ------------------------------------------------------------------
 
-# class PhpSrcProject(Project):
+    def get_test_cmd(self, test_name: str, coverage=True) -> list[str]:
+        """Return the make command to run a single FATE test."""
+        return ["make", test_name]
 
-#     def __init__(self, output_dir, input_dir) -> None:
-#         super().__init__()
-#         
-#         self._init(output_dir, input_dir, "php-src", "https://github.com/php/php-src")
+    def _run(self, cmd: list[str]) -> tuple[bool, dict]:
+        stdout, errorcode, stderr = sh(cmd, cwd=self.input_dir)
+        if errorcode != 0:
+            self.logger.error(f"Test failed:\n{stdout}\n{stderr}")
+        return errorcode == 0, {"stdout": stdout, "stderr": stderr, "errorcode": errorcode}
 
-#     def get_test_cmd(self, test_name: str) -> list[str]:
-#         return ["make", "test", f"TESTS={test_name}", "HARNESS_JOBS=1"]
-#         
-#     def _configure(self, cwd: Path, coverage=False) -> bool:
-#         # PHP requires buildconf to generate the configure script first
-#         _, returncode, err = sh(["./buildconf", "--force"], cwd=cwd)
-#         if returncode != 0:
-#             logger.error("buildconf failed")
-#             return False
+    def _get_test_dir_for_energy(self) -> Path:
+        return self.input_dir
 
-#         # Basic PHP configuration
-#         #config_args = [
-#         #    "./configure",
-#         #    "--disable-all", # Minimal build for speed
-#         #    "--enable-cli",  # Essential for running tests
-#         #    "--disable-cgi",
-#         #    "--disable-fpm",
-#         #    "--disable-phpdbg",
-#         #    "--without-pear",
-#         #    "--enable-filter", 
-#         #    "--enable-json",
-#         #    "--enable-tokenizer"
-#         #]
+    # ------------------------------------------------------------------
+    # Coverage
+    # ------------------------------------------------------------------
 
-#         config_args = [
-#             "./configure",
-#             "--prefix=/usr/local/php", 
-#             "--enable-cli",
-#             "CFLAGS=-fprofile-arcs -ftest-coverage",
-#             "CXXFLAGS=-fprofile-arcs -ftest-coverage"
-#         ]
-
-#         # env_test = os.environ.copy()
-#         # env_test["CFLAGS"] = "-O0 -g -w"
-#         # if coverage:
-#         #     env_test["CFLAGS"] += " --coverage"
-#         #     env_test["LDFLAGS"] = "--coverage"
-
-#         _, errorcode, _ = sh(cmd=config_args, cwd=cwd)
-#         return errorcode == 0
-
-#     def get_test(self,cwd):
-#         tests = []
-#         # PHP tests are .phpt files found in tests/, Zend/, ext/
-#         # We walk the directory to find them.
-#         tests = glob(os.path.join(cwd, "**/*.phpt"), recursive=True)
-#         tests = [os.path.splitext(os.path.basename(t))[0] for t in tests]
-#         #for root, dirs, files in os.walk(cwd):
-#         #    for f in files:
-#         #        if f.endswith(".phpt"):
-#         #            t_name = f[:-5] # remove .phpt
-#         #            rel_path = os.path.relpath(os.path.join(root, f), cwd)
-
-#         #            # Command to run a single test via make
-#         #            # NO_INTERACTION=1 prevents it from asking to send reports to PHP.net
-#         #            # TESTS=path points to the specific file
-#         #            cmd = f"NO_INTERACTION=1 make test TESTS='{rel_path}'"
-
-#         #            tests.append({
-#         #                "name": t_name,
-#         #                "cmd": cmd,
-#         #                "type": "phpt"
-#         #            })
-
-#         return tests
+    def coverage_file(self, test_name: str) -> list[str]:
+        """Collect covered source files from .gcda files in the in-source tree."""
+        return self._process_coverage_files(self.input_dir)

@@ -70,17 +70,17 @@ RUN git clone --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds
     cp perf /usr/bin && \
     cd / && rm -rf linux
 
-# Install Python 2.4 for compatibility with QEMU's build system. 
+# Install Python 2.7 for compatibility with QEMU's build system. 
 # We need to use an older Python version because QEMU's build system is not compatible with 
 # Python 3.
-RUN wget https://www.python.org/ftp/python/2.4.4/Python-2.4.4.tgz && \
-    tar -xzf Python-2.4.4.tgz && \
-    cd Python-2.4.4 && \
-    ./configure --prefix=/opt/python2.4 && \
+RUN wget https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tgz && \
+    tar -xzf Python-2.7.18.tgz && \
+    cd Python-2.7.18 && \
+    ./configure --prefix=/opt/python2.7 && \
     make && \
     make install && \
-    ln -s /opt/python2.4/bin/python2.4 /usr/local/bin/python2.4 && \
-    cd / && rm -rf Python-2.4.4 Python-2.4.4.tgz
+    ln -s /opt/python2.7/bin/python2.7 /usr/local/bin/python2.7 && \
+    cd / && rm -rf Python-2.7.18 Python-2.7.18.tgz
 
 COPY requirements.txt /app/
 RUN pip3 install --no-cache-dir --break-system-packages -r /app/requirements.txt

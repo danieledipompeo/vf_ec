@@ -2,6 +2,7 @@ import os
 import subprocess
 import threading
 import re
+import shlex
 from pathlib import Path
 
 from logger import get_logger
@@ -73,9 +74,11 @@ def sh(cmd: list[str] | str,
         - stdin is set to DEVNULL, so no input can be provided to the command.
     """
     if isinstance(cmd, list):
-        cmd_display = " ".join(cmd)
+        cmd_display = shlex.join(cmd)
+        args: list[str] | str = cmd_display if use_shell else cmd
     else:
         cmd_display = cmd
+        args = cmd
     logger.debug("+ %s%s %s", str(cwd) + "/" if cwd else "./", cmd_display, "(shell)" if use_shell else "")
 
     # args: list[str] | str = cmd
@@ -86,7 +89,7 @@ def sh(cmd: list[str] | str,
             # args = " ".join(cmd)
 
     process = subprocess.Popen(
-        cmd_display,
+        args,
         cwd=str(cwd) if cwd else None,
         env=env,
         text=True,
@@ -235,7 +238,7 @@ class EnergyHandler:
             energy_file = output_filename + f"__{iteration}.csv"
             iteration_count_file = output_filename + f"__{iteration}_count.txt"
 
-            wrapped_cmd = EnergyHandler._wrap_until_timeout(cmd, timeout_ms, iteration_count_file)
+            wrapped_script = EnergyHandler._wrap_until_timeout(cmd, timeout_ms, iteration_count_file)
 
             # Build perf as argv list (safer than huge shell string)
             perf_argv = [
@@ -245,17 +248,15 @@ class EnergyHandler:
                 "-x,", "--output", energy_file,
                 "--",
             ]
-            # wrapped_cmd already includes "bash -lc '<script>'" so we run via sh -c? Not needed.
-            # But since wrapped_cmd is a single string, we can still do: ["sh","-c", wrapped_cmd]
-            perf_argv += ["sh", "-c", wrapped_cmd]
+            perf_argv += ["bash", "-lc", wrapped_script]
 
-            out, rc, err = sh(perf_argv, cwd=Path(test_dir), use_shell=True)
+            out, rc, err = sh(perf_argv, cwd=Path(test_dir), use_shell=False)
             
             if rc != 0: 
                 logger.error(
                     f"[ERROR] Test '{test}' failed during energy measurement.\n"
                     f"Return code: {rc}\n"
-                    f"Command: {wrapped_cmd}\n"
+                    f"Script: {wrapped_script}\n"
                     f"STDERR: {err.strip()}\n"
                     f"STDOUT: {out.strip()}"
                 )
@@ -268,36 +269,39 @@ class EnergyHandler:
 
     @staticmethod
     def _wrap_until_timeout(test_cmd: list[str], timeout_ms: int, iteration_count_file: str | None = None) -> str:
-        import shlex
         """
-        Returns a bash command that runs `test_cmd` repeatedly until timeout expires.
+        Returns a bash script body that runs `test_cmd` repeatedly until timeout expires.
         - uses monotonic-ish wall clock via SECONDS (bash built-in, second resolution)
         - avoids killing a running iteration mid-command (it checks deadline BETWEEN iterations)
         - if iteration_count_file is provided, saves the loop iteration count to that file
+        - enables shell tracing by default for easier debugging
         """
         # Use bash -lc so we can rely on bash features and keep quoting predictable
         # SECONDS is integer seconds since shell start; good enough for energy runs (>= 2-5s).
         timeout_s = max(1, int((timeout_ms + 999) / 1000))  # ceil to seconds
+        cmd_quoted = " ".join(shlex.quote(part) for part in test_cmd)
 
-        # Build the echo statement if a count file is specified
-        count_line = f"echo $iteration_count > {shlex.quote(iteration_count_file)}" if iteration_count_file else ""
+        # Persist count even if a command fails under strict mode.
+        count_trap = (
+            f"trap 'printf %s\\\\n \"$iteration_count\" > {shlex.quote(iteration_count_file)}' EXIT"
+            if iteration_count_file
+            else ""
+        )
 
         # Important:
-        # - `set -e` makes failures stop the loop and propagate non-zero to perf (you want this)
+        # - `set -Eeuo pipefail` makes failures stop the loop and propagate non-zero to perf
         # - you can change to `|| true` if you prefer "keep looping even if one iteration fails"
-        wrapped = (
-            "bash -lc "
-            + shlex.quote(
-                f"""
-                set -e
-                end=$((SECONDS + {timeout_s}))
-                iteration_count=0
-                while [ $SECONDS -lt $end ]; do
-                  {" ".join(test_cmd)}
-                  ((iteration_count += 1))
-                done
-                {count_line}
-                """
-            )
-        )
-        return wrapped
+        script = f"""
+        set -Eeuo pipefail
+        iteration_count=0
+        trap 'rc=$?; echo "[energy-wrapper] error rc=${{rc}} line=${{LINENO}} cmd=${{BASH_COMMAND}}" >&2; exit $rc' ERR
+        {count_trap}
+        PS4='+ [energy-wrapper:${{LINENO}}] '
+        set -x
+        end=$((SECONDS + {timeout_s}))
+        while [ "$SECONDS" -lt "$end" ]; do
+            {cmd_quoted}
+            iteration_count=$((iteration_count + 1))
+        done
+        """
+        return script

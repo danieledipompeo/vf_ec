@@ -12,9 +12,9 @@ dataset:
 
 project:
 
-  - qemu:
-      name: "qemu"
-      repository: "https://gitlab.com/qemu-project/qemu.git"
+  - ffmpeg:
+      name: "FFmpeg"
+      repository: "https://github.com/FFmpeg/FFmpeg.git"
       build:
         commands: {}
         flags: {}
@@ -58,6 +58,14 @@ project:
   #- jasper:
   #    name: "jasper"
   #    repository: "https://github.com/jasper-software/jasper.git"
+  #    build:
+  #      commands: {}
+  #      flags: {}
+  #      compiler: ""
+
+  #- qemu:
+  #    name: "qemu"
+  #    repository: "https://gitlab.com/qemu-project/qemu.git"
   #    build:
   #      commands: {}
   #      flags: {}

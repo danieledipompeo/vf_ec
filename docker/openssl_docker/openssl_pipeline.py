@@ -64,9 +64,9 @@ def process_commit(project : Project, commit: str, coverage: bool = True) -> lis
     logger.info(f"Running {len(suite)} tests...")
 
     # pb = ProgressBar(len(suite), step=10)
-    # logger.warning(f"-- TEST SUITE LIMITED TO FIRST 5 TESTS OUT OF {len(suite)} TOTAL TESTS FOR DEMO PURPOSES.")
+    logger.warning(f"-- TEST SUITE LIMITED TO FIRST 20 TESTS OUT OF {len(suite)} TOTAL TESTS FOR DEMO PURPOSES.")
     l_suite = len(suite)
-    for i, t in enumerate(suite):
+    for i, t in enumerate(suite[:20]):
         # pb.set(i)
         logger.info(f"Running test {i+1}/{l_suite}: {t}")
 
@@ -85,6 +85,8 @@ def process_commit(project : Project, commit: str, coverage: bool = True) -> lis
         # run test
         start_time = time.time()
         test['passed'], error = project.run_test(t)
+        # logger.info(f"!!!!! Dry run, skipping test execution. !!!!!")
+        # test['passed'], error = True, None
         test['duration'] = time.time() - start_time
         logger.info(f" --- Test '{t}' completed in {test['duration']:.2f}s")
         
@@ -127,27 +129,6 @@ def compute_coverage(project: Project, commit: str):
     
     return process_results
     
-    ##if not kept_tests:
-    #    logger.warning(f"No tests cover the changed files. Skipping energy measurement for commit {commit[:8]}")
-    #    return None
-    
-    #logger.info(f"Now computing energy for {commit[:8]}.")
-        
-    ## prepare_for_energy_measurement()
-    #is_build = project.build(coverage=False)
-    #if not is_build:
-    #    logger.error(f"Build failed for commit {commit[:8]}. Skipping energy measurement.")
-    #    return None
-    
-    #for test in kept_tests:
-    #    project.compute_energy(test['name'], commit)
-
-    #if compute_energy_for_tests(project=project, tests=kept_tests, commit=commit) is None:
-    #    logger.error(f"Build failed for commit {commit[:8]}. Skipping energy measurement.")
-    #    return None
-
-    return process_results
-
 def compute_energy_for_tests(project, tests, commit):
     is_build = project.build(coverage=False)
     if not is_build:
@@ -156,28 +137,6 @@ def compute_energy_for_tests(project, tests, commit):
     
     for test in tests:
         project.compute_energy(test['name'], commit)
-    
-
-#def process_pair(project: Project, vuln: str, fix: str) -> dict | None:
-#    """
-#    Run coverage+energy for a vuln/fix pair and collate results.
-#    """
-#
-#    coverage_dict = compute_coverage(project, fix)
-#    if coverage_dict is None :
-#        logger.error(f"Skipping pair due to FIX commit failure: {fix[:8]}")
-#        return None
-#                  
-#    kept_tests = [t for t in coverage_dict.get('tests', []) if t.get('keep', True)]
-#    if not kept_tests:
-#        logger.warning(f"No tests to measure energy for in FIX commit: {fix[:8]}. Skipping pair.")
-#        return None
-#
-#    for commit in (("fix_commit", fix), ("vuln_commit", vuln)):        
-#        compute_energy_for_tests(project, kept_tests, commit)
-#  
-#    return coverage_dict
-    
     
 def extract_test_covering_git_changes(coverage_results: dict, target_files: set[str]):  
     """
@@ -224,6 +183,20 @@ def parse_csv(configuration: dict) -> list[dict]:
             data.append(row)
     return data
 
+def compute_energy(commit: str, tests: list[dict], project: Project, build: bool = True):
+    if build:
+        GitHandler.clean_repo(project.input_dir)
+        GitHandler.checkout(project.input_dir, commit)
+    
+        is_build = project.build(coverage=False)
+        if not is_build:
+            logger.error(f"Build failed for commit {commit[:8]}. Stopping pair processing.")
+            return False
+    
+    # logger.debug("--- ENERGY MEASUREMENT LIMITED TO FIRST 2 TESTS FOR DEMO PURPOSES.")
+    for test in tests:
+        project.compute_energy(test['name'], commit)
+
 def main():
     configuration = load_config(os.path.join(os.path.dirname(__file__), "config.yaml"))
 
@@ -259,19 +232,25 @@ def main():
                 logger.error(f"No tests to measure energy for in FIX commit: {fix[:8]}. Skipping pair.")
                 continue
 
-            # Measure energy for both vuln and fix commits
-            for commit in (vuln, fix):
-                GitHandler.clean_repo(project.input_dir)
-                GitHandler.checkout(project.input_dir, commit)
+            # # Measure energy for both vuln and fix commits
+            # for commit in (vuln, fix):
+            #     GitHandler.clean_repo(project.input_dir)
+            #     GitHandler.checkout(project.input_dir, commit)
                 
-                is_build = project.build(coverage=False)
-                if not is_build:
-                    logger.error(f"Build failed for commit {commit[:8]}. Stopping pair processing.")
-                    break
+            #     is_build = project.build(coverage=False)
+            #     if not is_build:
+            #         logger.error(f"Build failed for commit {commit[:8]}. Stopping pair processing.")
+            #         break
         
-                # logger.debug("--- ENERGY MEASUREMENT LIMITED TO FIRST 2 TESTS FOR DEMO PURPOSES.")
-                for test in kept_tests:
-                    project.compute_energy(test['name'], commit)
+            #     # logger.debug("--- ENERGY MEASUREMENT LIMITED TO FIRST 2 TESTS FOR DEMO PURPOSES.")
+            #     for test in kept_tests:
+            #         project.compute_energy(test['name'], commit)
+                    
+            compute_energy(project= project, tests=kept_tests, commit=fix, build = False)
+
+            if not compute_energy(project= project, tests=kept_tests, commit=vuln):
+                logger.error(f"Energy measurement failed for commit {vuln[:8]}. Skipping pair.")
+                continue
 
             coverage_path = os.path.join(project.output_dir, f"{project.name}_{vuln[:8]}_{fix[:8]}_coverage.json")
             coverage_dict['execution_time'] = time.time() - start_time
@@ -279,8 +258,5 @@ def main():
                 json.dump(coverage_dict, f, indent=2)
             logger.info(f"Saved coverage results to {coverage_path}")
             
-
-            
-
 if __name__ == "__main__":
     main()
