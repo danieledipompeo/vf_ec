@@ -1117,7 +1117,7 @@ class FFmpegProject(Project):
     """
 
     def __init__(self, output_dir, input_dir) -> None:
-        super().__init__(output_dir, input_dir, "FFmpeg", "https://git.ffmpeg.org/ffmpeg.git")
+        super().__init__(output_dir, input_dir, "FFmpeg", "https://github.com/FFmpeg/FFmpeg.git")
         # FFmpeg performs in-source builds; tests run from the top-level source dir.
         self.build_dir = self.input_dir
 
