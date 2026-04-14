@@ -9,6 +9,7 @@ import yaml
 from common import EnergyHandler, GitHandler, ProgressBar, sh
 from project import Project, ProjectFactory
 from logger import get_logger
+import project
 
 logger = get_logger(__name__)
 
@@ -183,7 +184,7 @@ def parse_csv(configuration: dict) -> list[dict]:
             data.append(row)
     return data
 
-def compute_energy(commit: str, tests: list[dict], project: Project, build: bool = True):
+def compute_energy(commit: str, tests: list[dict], project: Project, build: bool = True) -> bool:
     if build:
         GitHandler.clean_repo(project.input_dir)
         GitHandler.checkout(project.input_dir, commit)
@@ -196,6 +197,8 @@ def compute_energy(commit: str, tests: list[dict], project: Project, build: bool
     # logger.debug("--- ENERGY MEASUREMENT LIMITED TO FIRST 2 TESTS FOR DEMO PURPOSES.")
     for test in tests:
         project.compute_energy(test['name'], commit)
+    
+    return True
 
 def main():
     configuration = load_config(os.path.join(os.path.dirname(__file__), "config.yaml"))
@@ -246,9 +249,10 @@ def main():
             #     for test in kept_tests:
             #         project.compute_energy(test['name'], commit)
                     
-            compute_energy(project= project, tests=kept_tests, commit=fix, build = False)
-
-            if not compute_energy(project= project, tests=kept_tests, commit=vuln):
+            compute_energy(project = project, tests = kept_tests, commit = fix, build = False)
+            vuln_build_failure = compute_energy(project = project, tests = kept_tests, commit = vuln)
+            
+            if not vuln_build_failure:
                 logger.error(f"Energy measurement failed for commit {vuln[:8]}. Skipping pair.")
                 continue
 
