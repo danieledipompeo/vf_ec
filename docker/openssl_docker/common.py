@@ -239,12 +239,15 @@ class EnergyHandler:
             iteration_count_file = output_filename + f"__{iteration}_count.txt"
 
             wrapped_script = EnergyHandler._wrap_until_timeout(cmd, timeout_ms, iteration_count_file)
+            
+            sample_freq_ms = 100
 
             # Build perf as argv list (safer than huge shell string)
             perf_argv = [
                 "perf", "stat",
                 "-a",
                 "-e", f"{perf_events}",
+                "-I", f"{sample_freq_ms}",
                 "-x,", "--output", energy_file,
                 "--",
             ]
