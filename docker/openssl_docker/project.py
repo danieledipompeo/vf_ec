@@ -392,10 +392,15 @@ class CurlProject(Project):
             self.logger.info("Running CMake configuration for curl.")
             cmd = ["cmake", "-S", ".", "-B", CMAKE_BUILD_DIR, 
                    "-DCMAKE_BUILD_TYPE=Debug", 
-                   "-DENABLE_CURL_MANUAL=OFF", 
-                   "-DENABLE_TESTS=ON", 
-                   "-DENABLE_CURL_DEBUG=ON", 
-                   f"-DENABLE_CODE_COVERAGE={'ON' if coverage else 'OFF'}"]
+                   "-DENABLE_MANUAL=OFF", 
+                   "-DBUILD_TESTING=ON", 
+                   "-DENABLE_DEBUG=ON"
+                ]
+            if coverage:
+                cmd += [
+                    "-DCMAKE_C_FLAGS=--coverage",
+                    "-DCMAKE_EXE_LINKER_FLAGS=--coverage"
+                ]
         else:
             cmd = ["./buildconf"]
             self.logger.info("Running legacy Autotools configuration for curl.")
@@ -491,7 +496,7 @@ class LibarchiveProject(Project):
                "-DENABLE_COVERAGE=OFF",
                "-DENABLE_TEST=ON"]
 
-        dcmake_c_flags = '-DCMAKE_C_FLAGS="-g -O0 -w"'
+        dcmake_c_flags = "-DCMAKE_C_FLAGS=-g -O0 -w"
         if coverage:
             cmd.append('-DCMAKE_EXE_LINKER_FLAGS="-fprofile-arcs -ftest-coverage"')
             dcmake_c_flags = '-DCMAKE_C_FLAGS="-g -O0 -w -fprofile-arcs -ftest-coverage"'
@@ -662,10 +667,6 @@ class OpenSSLProject(Project):
     SHARED_LDFLAGS="-m64 --coverage"
     EX_LDL="-ldl --coverage"
     
-    CFLAG = [f'CFLAG="{CFLAG_COVERAGE}"']
-    LDFLAGS = [f'LDFLAGS="{SHARED_LDFLAGS}"']
-    EX_LIBS = [f'EX_LIBS="{EX_LDL}"']
-    
     def __init__(self, output_dir, input_dir) -> None:
         super().__init__(output_dir, input_dir, "openssl", "https://github.com/openssl/openssl") 
         self.test_dir = self.input_dir
@@ -673,11 +674,7 @@ class OpenSSLProject(Project):
 
     def get_test_cmd(self, test_name: str, coverage=False) -> list[str]:
         cmd = ["make", "test"]
-        if coverage:
-            cmd += OpenSSLProject.CFLAG
-            cmd += OpenSSLProject.LDFLAGS
-            cmd += OpenSSLProject.EX_LIBS
-        
+
         cmd += ["TESTS=" + test_name, "HARNESS_JOBS=1"]
         return cmd
         
@@ -694,11 +691,6 @@ class OpenSSLProject(Project):
     def _build(self, n_proc=1, coverage=False):
         cmd = ["make"]
         
-        if coverage:
-            cmd += OpenSSLProject.CFLAG
-            cmd += OpenSSLProject.LDFLAGS
-            cmd += OpenSSLProject.EX_LIBS
-        
         if n_proc == -1:
             cmd.append(f"-j")
         else:
@@ -707,8 +699,29 @@ class OpenSSLProject(Project):
         return errorcode == 0
     
     def _configure(self, cwd: Path, coverage=False) -> bool:
-        # Use shared libraries with proper configuration for linking
-        config_args = ["./Configure", "linux-x86_64", "shared", "no-asm"]
+        config_args = ["./Configure"]
+        if coverage:
+            # OpenSSL Configure expects compiler flags as Configure arguments,
+            # not as trailing positional args after the target.
+            config_args += [
+                "-fPIC",
+                "-DOPENSSL_PIC",
+                "-DOPENSSL_THREADS",
+                "-D_REENTRANT",
+                "-DDSO_DLFCN",
+                "-DHAVE_DLFCN_H",
+                "-m64",
+                "-DL_ENDIAN",
+                "-DTERMIO",
+                "-O0",
+                "-Wall",
+                "-DMD32_REG_T=int",
+                "-fprofile-arcs",
+                "-ftest-coverage",
+            ]
+
+        config_args += ["linux-x86_64", "no-shared", "no-asm"]
+
         _, errorcode, err = sh(config_args, cwd=cwd)
         
         if errorcode != 0:
@@ -735,7 +748,7 @@ class VimProject(Project):
         super().__init__(output_dir, input_dir, "vim", "https://github.com/vim/vim")
         self.source_dir = self.input_dir / VimProject.SOURCE_DIR
         self.test_dir = self.input_dir / VimProject.TEST_DIR
-        self.build_dir = self.source_dir 
+        self.build_dir = self.test_dir
         
     def _get_test_dir_for_energy(self) -> Path:
         return self.test_dir
@@ -761,10 +774,14 @@ class VimProject(Project):
 
     def get_test_cmd(self, test_name: str, coverage=True) -> list[str]:
         cmd = ["make", test_name, "HARNESS_JOBS=1", "LINES=24", "COLUMNS=80"]
-        cmd_str = '"stty rows 24 cols 80;'
-        cmd_str += " ".join(cmd)
-        cmd_str += '"'
-        return ["script", "-q", "-f", "-e", "-c", f"{cmd_str}", "/dev/null"]
+        cmd_str = "stty rows 24 cols 80;" + " ".join(cmd)
+        return ["script", "-q", "-f", "-e", "-c", cmd_str, "/dev/null"]
+    
+    def _run(self, cmd: list[str]) -> tuple[bool, dict]:
+        stdout, errorcode, stderr = sh(cmd, cwd=Path(self.build_dir), use_shell=False)
+        if errorcode != 0:
+            self.logger.error(f"Test output:\n{stdout}\n{stderr}")
+        return errorcode == 0, {"stdout": stdout, "stderr": stderr, "errorcode": errorcode}
 
     def get_test(self) -> list[str]:
         skipped_tests = ["test_filechanged", 
@@ -793,6 +810,12 @@ class VimProject(Project):
             "--enable-gui=no",
             "--without-x"
         ]
+
+        env = None
+        if coverage:
+            env = os.environ.copy()
+            env['CFLAGS'] = "-g -O0 -fprofile-arcs -ftest-coverage"
+            env['LDFLAGS'] = "-fprofile-arcs -ftest-coverage -lgcov"
         
         _, errorcode, err = sh(config_args, cwd=self.source_dir)
         if errorcode != 0:
@@ -805,8 +828,12 @@ class VimProject(Project):
     def _build(self, n_proc=1, coverage=False):
         cmd = ["make"]
 
+        env = None
         if coverage:
-            cmd += ['PROFILE_CFLAGS="-g -O0 -fprofile-arcs -ftest-coverage -DWE_ARE_PROFILING -DUSE_GCOV_FLUSH"', 'LDFLAGS="--coverage"']
+            cmd += [
+                "PROFILE_CFLAGS=-g -O0 -fprofile-arcs -ftest-coverage -DWE_ARE_PROFILING -DUSE_GCOV_FLUSH",
+                "LDFLAGS=-fprofile-arcs -ftest-coverage -lgcov"
+            ]
 
         if n_proc == -1:
             cmd.append(f"-j")
@@ -887,23 +914,12 @@ class TcpDumpProject(Project):
 
     def _configure(self, cwd: Path, coverage=False) -> bool:
         cmd = ["./configure"]
+        env = None
         if coverage:
-            cmd = [
-                'CFLAGS="-g -O0 -fprofile-arcs -ftest-coverage"',
-                'LDFLAGS="-fprofile-arcs -ftest-coverage"',
-                "./configure",
-            ]
-        _, errorcode, _ = sh(cmd, cwd=cwd)
-        return errorcode == 0
-
-    def _build(self, n_proc=-1, coverage=False) -> bool:
-        cmd = ["make"]
-        if n_proc == -1:
-            nproc = os.cpu_count() or 1
-            cmd.append(f"-j{nproc}")
-        else:
-            cmd.append(f"-j{n_proc}")
-        _, errorcode, _ = sh(cmd=cmd, cwd=self.input_dir)
+            env = os.environ.copy()
+            env["CFLAGS"] = "-g -O0 -fprofile-arcs -ftest-coverage"
+            env["LDFLAGS"] = "-fprofile-arcs -ftest-coverage"
+        _, errorcode, _ = sh(cmd, cwd=cwd, env=env)
         return errorcode == 0
 
 # TODO: check why it doesn't create energy data

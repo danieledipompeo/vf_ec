@@ -65,9 +65,9 @@ def process_commit(project : Project, commit: str, coverage: bool = True) -> lis
     logger.info(f"Running {len(suite)} tests...")
 
     # pb = ProgressBar(len(suite), step=10)
-    logger.warning(f"-- TEST SUITE LIMITED TO FIRST 20 TESTS OUT OF {len(suite)} TOTAL TESTS FOR DEMO PURPOSES.")
+    # logger.warning(f"-- TEST SUITE LIMITED TO FIRST 20 TESTS OUT OF {len(suite)} TOTAL TESTS FOR DEMO PURPOSES.")
     l_suite = len(suite)
-    for i, t in enumerate(suite[:20]):
+    for i, t in enumerate(suite):
         # pb.set(i)
         logger.info(f"Running test {i+1}/{l_suite}: {t}")
 

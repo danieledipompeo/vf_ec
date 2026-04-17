@@ -138,7 +138,10 @@ class GitHandler:
     
     @staticmethod
     def clone_repo(cwd, repo_url, dest_path=""):
-        cmd = ['git', 'clone', repo_url, dest_path]
+        cmd = ['git', 'clone', repo_url]
+        # Append destination only when it carries a meaningful value.
+        if dest_path and dest_path.strip() != "":
+            cmd += [dest_path]
         if not os.path.exists(os.path.join(cwd, os.path.basename(repo_url).replace('.git',''))):
             sh(cmd, cwd)
     
