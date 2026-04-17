@@ -498,12 +498,12 @@ class LibarchiveProject(Project):
 
         dcmake_c_flags = "-DCMAKE_C_FLAGS=-g -O0 -w"
         if coverage:
-            cmd.append('-DCMAKE_EXE_LINKER_FLAGS="-fprofile-arcs -ftest-coverage"')
-            dcmake_c_flags = '-DCMAKE_C_FLAGS="-g -O0 -w -fprofile-arcs -ftest-coverage"'
+            cmd.append("-DCMAKE_EXE_LINKER_FLAGS=-fprofile-arcs -ftest-coverage")
+            dcmake_c_flags = "-DCMAKE_C_FLAGS=-g -O0 -w -fprofile-arcs -ftest-coverage"
 
         cmd.append(dcmake_c_flags)
 
-        _, errorcode, _ = sh(cmd, cwd=cwd)
+        _, errorcode, _ = sh(cmd, cwd=cwd, use_shell=False)
         return errorcode == 0
     
     def _build(self, n_proc=-1, coverage=False):
