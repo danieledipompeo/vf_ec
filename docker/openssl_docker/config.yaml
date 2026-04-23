@@ -12,6 +12,15 @@ dataset:
 
 project:
 
+
+  - curl:
+      name: "curl"
+      repository: "https://github.com/curl/curl"
+      build:
+        commands: {}
+        flags: {}
+        compiler: ""
+
   - libarchive:
       name: "libarchive"
       repository: "https://github.com/libarchive/libarchive"

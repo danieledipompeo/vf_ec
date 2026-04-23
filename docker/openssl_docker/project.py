@@ -8,6 +8,7 @@ import re
 
 from common import GitHandler, EnergyHandler, sh
 from logger import get_logger
+from extract_coverage_data import generate_gcovr_json, parse_gcovr_covered_lines
 
 logger = get_logger(__name__)
 
@@ -151,34 +152,66 @@ class Project(ABC):
                 covered_files.append(str(real_path))
         return covered_files if covered_files else None
 
-    def coverage_file(self, test_name: str) -> list[str]:
-        return self._process_coverage_files(Path(self.build_dir))
+    # def coverage_file(self, test_name: str) -> list[str]:
+    def coverage_file(self, test_name: str) -> dict[str, set[int]]:
+        return self._process_coverage_files(self.build_dir, test_name) 
     
-    def _process_coverage_files(self, building_dir: Path) -> list[str]:
-        """Process .gcda files and return list of covered files."""
-        gco_files = list(building_dir.rglob("*.gcda"))
-        self.logger.debug(f"Found {len(gco_files)} .gcda files in {building_dir}")
-        covered = []
-        for file in gco_files:
-            obj_dir = file.parent
-            stdout, code, stderr = sh(["gcov", "-n", "-o", str(obj_dir), str(file)], cwd=building_dir)
-            if code != 0:
-                self.logger.error(f"gcov failed for {file} with error: {stderr}")
-                continue
-            
-            covered_files = self._extract_covered_file(stdout, obj_dir)
-            if covered_files:
-                for covered_file in covered_files:
-                    covered_path = Path(covered_file)
-                    try:
-                        covered.append(str(covered_path.relative_to(self.input_dir)))
-                    except ValueError:
-                        self.logger.debug(
-                            "Skipping generated coverage file outside source tree: %s",
-                            covered_path,
-                        )
-                
+    #def _process_coverage_files(self, building_dir: Path) -> list[str]:
+    #    """Process .gcda files and return list of covered files."""
+    #    gco_files = list(building_dir.rglob("*.gcda"))
+    #    self.logger.debug(f"Found {len(gco_files)} .gcda files in {building_dir}")
+    #    covered = []
+    #    for file in gco_files:
+    #        obj_dir = file.parent
+    #        stdout, code, stderr = sh(["gcov", "-n", "-o", str(obj_dir), str(file)], cwd=building_dir)
+    #        if code != 0:
+    #            self.logger.error(f"gcov failed for {file} with error: {stderr}")
+    #            continue
+    #        
+    #        covered_files = self._extract_covered_file(stdout, obj_dir)
+    #        if covered_files:
+    #            for covered_file in covered_files:
+    #                covered_path = Path(covered_file)
+    #                try:
+    #                    covered.append(str(covered_path.relative_to(self.input_dir)))
+    #                except ValueError:
+    #                    self.logger.debug(
+    #                        "Skipping generated coverage file outside source tree: %s",
+    #                        covered_path,
+    #                    )
+    #            
+    #    return covered
+    
+    def _process_coverage_files(self, building_dir: Path, test_name: str) -> dict[str, set[int]]:
+        """
+        Process .gcda files using gcovr JSON output to get covered lines per file.
+        Return a dictionary mapping source file paths (relative to input_dir) to sets of covered line numbers.
+        """
+        
+        gcovr_json_path = (building_dir / f"{test_name}.json").resolve()
+        gcda_dirs_out, _, _ = sh(
+            ["find", ".", "-type", "f", "-name", "*.gcda", "-exec", "dirname", "{}", "+"],
+            cwd=building_dir,
+            use_shell=False,
+        )
+        gcda_folders = sorted({line.strip() for line in gcda_dirs_out.splitlines() if line.strip()})
+        try:
+            generate_gcovr_json(building_dir, gcovr_json_path, gcda_folders)
+        except RuntimeError as err:
+            print("Warning: gcovr generation failed, continuing with lcov only.")
+            print(err)
+            gcovr_json_path = None
+        
+        covered = {
+            file_name: covered_lines
+            for file_name, covered_lines in (
+                parse_gcovr_covered_lines(gcovr_json_path, self.input_dir) if gcovr_json_path else {}
+            ).items()
+            if str(file_name).strip() and covered_lines
+        }
+        
         return covered
+         
 
     def _run(self, cmd: list[str]) -> tuple[bool, dict]:
         stdout, errorcode, stderr = sh(cmd, cwd=Path(self.build_dir))
@@ -233,9 +266,10 @@ class ImageMagickProject(Project):
     
     def __init__(self, output_dir, input_dir) -> None:
         super().__init__(output_dir, input_dir, "ImageMagick", "https://github.com/ImageMagick/ImageMagick")
+        self.build_dir = self.input_dir
         
-    def coverage_file(self, test_name: str) -> list[str]:
-        return self._process_coverage_files(self.input_dir)
+    # def coverage_file(self, test_name: str) -> list[str]:
+        # return self._process_coverage_files(self.input_dir)
     
     def _get_test_dir_for_energy(self) -> Path:
         return self.input_dir
@@ -383,9 +417,9 @@ class CurlProject(Project):
     def __init__(self, output_dir, input_dir) -> None:
         super().__init__(output_dir, input_dir, "curl", "https://github.com/curl/curl")
     
-    def coverage_file(self, test_name: str) -> list[str]:
-        building_dir = self.build_dir if self._has_cmake_build() else self.input_dir
-        return self._process_coverage_files(building_dir)
+    def coverage_file(self, test_name: str) -> dict[str, set[int]] | None:
+        self.build_dir = self.input_dir if not self._has_cmake_build() else self.build_dir
+        return super().coverage_file(test_name)
     
     def _configure(self, cwd: Path, coverage=False) -> bool:
         if (cwd / "CMakeLists.txt").exists():
@@ -419,8 +453,8 @@ class CurlProject(Project):
             if  coverage:
                 cmd += [
                   "--disable-shared",
-                  "CFLAGS='-O0 -g --coverage -fprofile-arcs -ftest-coverage'",
-                  "LDFLAGS='--coverage'"]
+                  "CFLAGS=-O0 -g --coverage -fprofile-arcs -ftest-coverage",
+                  "LDFLAGS=--coverage"]
 
         _, errorcode, _ = sh(cmd, cwd=cwd)
         return errorcode == 0
@@ -454,6 +488,10 @@ class CurlProject(Project):
             cmd = ["./runtests.pl", f"{test_name.replace('test', '')}"]
             
         return cmd
+
+    def _run(self, cmd: list[str]) -> tuple[bool, dict]:
+        self.build_dir = self.input_dir / "tests" if not self._has_cmake_build() else self.input_dir / CMAKE_BUILD_DIR
+        return super()._run(cmd)
 
     def get_test(self) -> list[str]:
         build_dir = self.input_dir / CMAKE_BUILD_DIR
@@ -862,9 +900,6 @@ class TcpDumpProject(Project):
         # Tests are executed from inside the tests/ sub-directory
         self.build_dir = self.input_dir
 
-    def coverage_file(self, test_name: str) -> list[str]:
-        return self._process_coverage_files(self.input_dir)
-
     # ------------------------------------------------------------------
     # Test discovery
     # ------------------------------------------------------------------
@@ -1008,9 +1043,6 @@ class QEMUProject(Project):
                     return False, {"errorcode": rc, "stdout": out, "stderr": err}
 
         return super().run_test(test_name, coverage=coverage)
-
-    def coverage_file(self, test_name: str) -> list[str]:
-        return self._process_coverage_files(self.build_dir)
 
     def get_test_cmd(self, test_name: str, coverage=True) -> list[str]:
         meson = self._meson_executable()
@@ -1202,11 +1234,3 @@ class FFmpegProject(Project):
 
     def _get_test_dir_for_energy(self) -> Path:
         return self.input_dir
-
-    # ------------------------------------------------------------------
-    # Coverage
-    # ------------------------------------------------------------------
-
-    def coverage_file(self, test_name: str) -> list[str]:
-        """Collect covered source files from .gcda files in the in-source tree."""
-        return self._process_coverage_files(self.input_dir)

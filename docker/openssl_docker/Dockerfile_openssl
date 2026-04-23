@@ -7,13 +7,17 @@ RUN set -eux; \
     sed -i 's|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
+        autoconf \
+        automake \
         bison \
         build-essential \
         ca-certificates \
         cmake \
         curl \
         flex \
+        gcover \
         git \
+        lcov \
         libaio-dev \
         libbluetooth-dev \
         libbrlapi-dev \
@@ -42,6 +46,8 @@ RUN set -eux; \
         libseccomp-dev \
         libsnappy-dev \
         libssh-dev \
+        libtool \
+        libtool-bin \
         libtraceevent-dev \
         libunwind-dev \
         libvde-dev \

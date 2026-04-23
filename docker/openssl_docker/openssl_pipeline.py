@@ -74,13 +74,14 @@ def process_commit(project : Project, commit: str, coverage: bool = True) -> lis
         test = {
             "name": t,
             "passed": False,
-            "covered_files": [],
+            "covered_files": {},
             "duration": 0.0
         }
 
-        # Clean previous coverage data
-        sh(["find", ".", "-name", "*.gcda", "-delete"], Path(project.output_dir))
-        sh(["find", ".", "-name", "*.gcno", "-delete"], Path(project.output_dir))
+        # Delete all .gcda (runtime counters) recursively from the build tree.
+        # .gcno files are compile-time artifacts and must NOT be deleted between
+        # test runs — gcov/gcovr needs them to interpret the .gcda data.
+        sh(["find", ".", "-name", "*.gcda", "-delete"], Path(project.build_dir))
         logger.info(f"Coverage data cleaned before running test '{t}'.")
 
         # run test
@@ -114,9 +115,9 @@ def compute_coverage(project: Project, commit: str):
     
     logger.info(f"-- Processing commit age: {GitHandler.get_age_of_commit(project.input_dir, commit)}")
     
-    git_changed_files= GitHandler.get_git_diff_files(project.input_dir, commit)
-    
-    if not git_changed_files:
+    git_changed_lines = GitHandler.get_changed_lines(project.input_dir, commit)
+
+    if not git_changed_lines:
         logger.error("No target files found in git diff.")
         return None
     
@@ -125,7 +126,7 @@ def compute_coverage(project: Project, commit: str):
         logger.error("No successful tests in fix commit. Skipping processing.")
         return None
     
-    extract_test_covering_git_changes(process_results, git_changed_files)
+    extract_test_covering_git_changes(process_results, git_changed_lines)
     logger.info(f"Extracted tests covering changed files for commit {commit[:8]}).")
     
     return process_results
@@ -139,20 +140,57 @@ def compute_energy_for_tests(project, tests, commit):
     for test in tests:
         project.compute_energy(test['name'], commit)
     
-def extract_test_covering_git_changes(coverage_results: dict, target_files: set[str]):  
+def extract_test_covering_git_changes(
+    coverage_results: dict,
+    target_lines_by_file: dict[str, set[int]],
+):
     """
     Mark "keep" in tests that cover changed files. 
     
     :param coverage_results: Dictionary with test results and coverage data
-    :param target_files: Set of files changed in the git commit (can be full paths)
+    :param target_lines_by_file: Changed line numbers keyed by file path from git diff
     """
-    target_files = {tf for tf in target_files if tf.endswith(('.c', '.cpp', '.h', '.hpp'))}
+    def _to_ranges(lines: set[int]) -> list[tuple[int, int]]:
+        """Convert discrete line numbers to inclusive contiguous ranges."""
+        if not lines:
+            return []
+        ordered = sorted(int(line) for line in lines)
+        ranges: list[tuple[int, int]] = []
+        start = prev = ordered[0]
+        for line in ordered[1:]:
+            if line == prev + 1:
+                prev = line
+                continue
+            ranges.append((start, prev))
+            start = prev = line
+        ranges.append((start, prev))
+        return ranges
+
+    target_ranges_by_file = {
+        str(path): _to_ranges(set(lines))
+        for path, lines in target_lines_by_file.items()
+        if str(path).endswith((".c", ".cpp", ".h", ".hpp")) and lines
+    }
+
     for test in coverage_results.get('tests', []):
-        covered_files = set(str(cf) for cf in test.get('covered_files', []))
-        
-        # Mark keep=True if test covers ANY of the changed files
-        # Short-circuits at first match
-        test['keep'] = bool(target_files & covered_files)
+        covered_files = test.get('covered_files', {})
+        keep = False
+
+        if isinstance(covered_files, dict):
+            for covered_file, covered_lines in covered_files.items():
+                changed_ranges = target_ranges_by_file.get(str(covered_file))
+                if not changed_ranges:
+                    continue
+
+                covered_line_set = set(int(line) for line in covered_lines)
+                if any(
+                    any(start <= line <= end for start, end in changed_ranges)
+                    for line in covered_line_set
+                ):
+                    keep = True
+                    break
+
+        test['keep'] = keep
 
 def download_dataset(config: dict):
     """
@@ -227,7 +265,7 @@ def main():
 
             coverage_dict = compute_coverage(project, fix)
             if coverage_dict is None :
-                logger.error(f"Skipping pair due to FIX commit failure: {fix[:8]}")
+                logger.error(f"Skipping pair due to no coverage data for FIX commit: {fix[:8]}")
                 continue
 
             kept_tests = [t for t in coverage_dict.get('tests', []) if t.get('keep', True)]
@@ -259,7 +297,7 @@ def main():
             coverage_path = os.path.join(project.output_dir, f"{project.name}_{vuln[:8]}_{fix[:8]}_coverage.json")
             coverage_dict['execution_time'] = time.time() - start_time
             with open(coverage_path, "w") as f:
-                json.dump(coverage_dict, f, indent=2)
+                json.dump(coverage_dict, f, indent=2, default=list)
             logger.info(f"Saved coverage results to {coverage_path}")
             
 if __name__ == "__main__":

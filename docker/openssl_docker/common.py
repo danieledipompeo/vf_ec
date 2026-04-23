@@ -155,11 +155,70 @@ class GitHandler:
             return datetime.fromtimestamp(timestamp).year
         return None
 
+    @staticmethod
+    def get_changed_lines(repo_dir: Path, commit: str) -> dict[str, set[int]]:
+        """Return changed line numbers per file for the given commit."""
+        cmd = ["git", "show", "--unified=0", "--format=", commit]
+        result = subprocess.run(
+            cmd,
+            cwd=repo_dir,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        changed: dict[str, set[int]] = {}
+        current_file: str | None = None
+        hunk_re = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
+
+        for raw_line in result.stdout.splitlines():
+            if raw_line.startswith("+++ b/"):
+                file_name = raw_line[6:].strip()
+                if file_name == "/dev/null":
+                    current_file = None
+                    continue
+                current_file = GitHandler._normalize_repo_path(file_name, repo_dir)
+                changed.setdefault(current_file, set())
+                continue
+
+            if current_file is None:
+                continue
+
+            match = hunk_re.match(raw_line)
+            if not match:
+                continue
+
+            start_line = int(match.group(1))
+            count = int(match.group(2) or "1")
+
+            # Deletion-only hunks have a +<line>,0 range. Keep the insertion
+            # anchor line so downstream matching can still reason about where
+            # the change happened in the resulting file.
+            if count <= 0:
+                changed[current_file].add(start_line)
+                continue
+
+            for line_no in range(start_line, start_line + count):
+                changed[current_file].add(line_no)
+
+        return changed
+    
+    @staticmethod
+    def _normalize_repo_path(path_value: str, repo_dir: Path) -> str:
+        """Normalize path to repository-relative format when possible."""
+        path_obj = Path(path_value)
+        if path_obj.is_absolute():
+            try:
+                return str(path_obj.resolve().relative_to(repo_dir.resolve()))
+            except ValueError:
+                return str(path_obj)
+        return str(path_obj)
+
 class EnergyHandler:
 
     ITERATION_TIMEOUT_MS = 5000
     COOL_DOWN_SEC = 1.0
-    ITERATIONS = 5
+    ITERATIONS = 30
     output_dir = "energy_measurements"      
 
     @staticmethod
