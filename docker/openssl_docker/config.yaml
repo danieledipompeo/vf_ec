@@ -12,14 +12,6 @@ dataset:
 
 project:
 
-  - libxml2:
-      name: "libxml2"
-      repository: "https://gitlab.gnome.org/GNOME/libxml2.git"
-      build:
-        commands: {}
-        flags: {}
-        compiler: ""
-
   - curl:
       name: "curl"
       repository: "https://github.com/curl/curl"
@@ -28,37 +20,45 @@ project:
         flags: {}
         compiler: ""
 
-  - libarchive:
-      name: "libarchive"
-      repository: "https://github.com/libarchive/libarchive"
-      build:
-        commands: {}
-        flags: {}
-        compiler: ""
+  #- libxml2:
+  #    name: "libxml2"
+  #    repository: "https://gitlab.gnome.org/GNOME/libxml2.git"
+  #    build:
+  #      commands: {}
+  #      flags: {}
+  #      compiler: ""
 
-  - openssl:
-      name: "openssl"
-      repository: "https://github.com/openssl/openssl"
-      build:
-        commands: {}
-        flags: {}
-        compiler: ""
+  #- libarchive:
+  #    name: "libarchive"
+  #    repository: "https://github.com/libarchive/libarchive"
+  #    build:
+  #      commands: {}
+  #      flags: {}
+  #      compiler: ""
 
-  - vim:
-      name: "vim"
-      repository: "https://github.com/vim/vim.git"
-      build:
-        commands: {}
-        flags: {}
-        compiler: ""
+  #- openssl:
+  #    name: "openssl"
+  #    repository: "https://github.com/openssl/openssl"
+  #    build:
+  #      commands: {}
+  #      flags: {}
+  #      compiler: ""
 
-  - tcpdump:
-      name: "tcpdump"
-      repository: "https://github.com/the-tcpdump-group/tcpdump.git"
-      build:
-        commands: {}
-        flags: {}
-        compiler: ""
+  #- vim:
+  #    name: "vim"
+  #    repository: "https://github.com/vim/vim.git"
+  #    build:
+  #      commands: {}
+  #      flags: {}
+  #      compiler: ""
+
+  #- tcpdump:
+  #    name: "tcpdump"
+  #    repository: "https://github.com/the-tcpdump-group/tcpdump.git"
+  #    build:
+  #      commands: {}
+  #      flags: {}
+  #      compiler: ""
 
   #- ffmpeg:
   #    name: "FFmpeg"

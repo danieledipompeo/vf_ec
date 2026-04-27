@@ -232,7 +232,7 @@ def compute_energy(commit: str, tests: list[dict], project: Project, build: bool
             logger.error(f"Build failed for commit {commit[:8]}. Stopping pair processing.")
             return False
     
-    # logger.debug("--- ENERGY MEASUREMENT LIMITED TO FIRST 2 TESTS FOR DEMO PURPOSES.")
+    logger.info(f"Computing energy for {len(tests)} tests on commit {commit[:8]}...")
     for test in tests:
         project.compute_energy(test['name'], commit)
     
@@ -251,7 +251,8 @@ def main():
         out_dir = configuration.get('paths', {}).get('output_dir')
         project = ProjectFactory.get_project(name=project_config.get('name'), 
                                              input_dir=in_dir, 
-                                             output_dir=out_dir) 
+                                             output_dir=out_dir)
+        
         
         logger.info(f"Starting processing: {project.name}")
 
@@ -260,11 +261,28 @@ def main():
         
         # logger.debug("--- PAIRS LIMITED TO FIRST 2 FOR DEMO PURPOSES.")
         for i, (vuln, fix) in enumerate(pairs):
+            coverage_dict = {"hash": fix, "tests": []}
+            kept_tests: list[dict] = []
+
             start_time = time.time()
             logger.info(f"[{i+1}/{len(pairs)}] Processing Pair: {vuln[:8]} -> {fix[:8]}")
 
-            kept_tests_path = os.path.join(project.output_dir, f"{project.name}_{fix[:8]}_kept_tests.json")
-            if not os.path.exists(kept_tests_path):
+            kept_tests_path = (
+                project.input_dir.parent 
+                / "kept_tests" 
+                / f"{project.name}" 
+                / f"{project.name}_{fix[:8]}_kept_tests.json"
+            )
+            
+            if os.path.exists(kept_tests_path.parent):
+                # Folder exists: this project was already processed — never re-run coverage tests.
+                if not os.path.exists(kept_tests_path):
+                    logger.warning(f"No kept tests file found for {fix[:8]}. Skipping pair.")
+                    continue
+                with open(kept_tests_path, "r") as f:
+                    kept_tests = json.load(f)
+                coverage_dict['tests'] = kept_tests
+            else:
                 coverage_dict = compute_coverage(project, fix)
                 if coverage_dict is None :
                     logger.error(f"Skipping pair due to no coverage data for FIX commit: {fix[:8]}")
@@ -278,39 +296,19 @@ def main():
                 # dump kept_tests to json for later reference
                 with open(kept_tests_path, "w") as f:
                     json.dump(kept_tests, f, indent=2, default=list)
-            else:
-                continue
-                with open(kept_tests_path, "r") as f:
-                    kept_tests = json.load(f)
 
-
-            # # Measure energy for both vuln and fix commits
-            # for commit in (vuln, fix):
-            #     GitHandler.clean_repo(project.input_dir)
-            #     GitHandler.checkout(project.input_dir, commit)
-                
-            #     is_build = project.build(coverage=False)
-            #     if not is_build:
-            #         logger.error(f"Build failed for commit {commit[:8]}. Stopping pair processing.")
-            #         break
-        
-            #     # logger.debug("--- ENERGY MEASUREMENT LIMITED TO FIRST 2 TESTS FOR DEMO PURPOSES.")
-            #     for test in kept_tests:
-            #         project.compute_energy(test['name'], commit)
-
-
-            #compute_energy(project = project, tests = kept_tests, commit = fix)
-            #vuln_build_failure = compute_energy(project = project, tests = kept_tests, commit = vuln)
+            compute_energy(project = project, tests = kept_tests, commit = fix)
+            vuln_build_failure = compute_energy(project = project, tests = kept_tests, commit = vuln)
             
-            #if not vuln_build_failure:
-            #    logger.error(f"Energy measurement failed for commit {vuln[:8]}. Skipping pair.")
-            #    continue
+            if not vuln_build_failure:
+                logger.error(f"Energy measurement failed for commit {vuln[:8]}. Skipping pair.")
+                continue
 
-            #coverage_path = os.path.join(project.output_dir, f"{project.name}_{vuln[:8]}_{fix[:8]}_coverage.json")
-            #coverage_dict['execution_time'] = time.time() - start_time
-            #with open(coverage_path, "w") as f:
-            #    json.dump(coverage_dict, f, indent=2, default=list)
-            #logger.info(f"Saved coverage results to {coverage_path}")
+            coverage_path = os.path.join(project.output_dir, f"{project.name}_{vuln[:8]}_{fix[:8]}_coverage.json")
+            coverage_dict['execution_time'] = time.time() - start_time
+            with open(coverage_path, "w") as f:
+                json.dump(coverage_dict, f, indent=2, default=list)
+            logger.info(f"Saved coverage results to {coverage_path}")
             
 if __name__ == "__main__":
     main()
