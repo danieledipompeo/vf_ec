@@ -94,6 +94,6 @@ RUN pip3 install --no-cache-dir --break-system-packages -r /app/requirements.txt
 # 2. Setup paths
 WORKDIR /app
 
-COPY openssl_pipeline.py common.py project.py logger.py config.yaml /app/
+COPY openssl_pipeline.py common.py project.py logger.py extract_coverage_data.py config.yaml /app/
 
 CMD ["python3", "openssl_pipeline.py"]
