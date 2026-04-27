@@ -335,8 +335,13 @@ class LibXML2Project(Project):
             self.logger.info("Using CMake logic to get test command for libxml2.")
             return ["ctest", "-R", f"^{test_name}$", "--output-on-failure"]
         else:
-            self.logger.info("Using Autotools logic to get test command for libxml2.")
-            return ["./runtest", f'"{test_name}"']
+            self.logger.info(f"Using Autotools logic to get test {test_name} command for libxml2.")
+            # Check if runtest binary exists; if not, try via make check
+            runtest_bin = self.input_dir / "runtest"
+            if not runtest_bin.exists():
+                self.logger.warning(f"runtest binary not found at {runtest_bin}, will use 'make check'")
+                return ["make", "check", f"TESTS={test_name}"]
+            return ["./runtest", test_name]
     
     def get_test(self) -> list[str]:
         if self._has_cmake_build():
@@ -372,11 +377,17 @@ class LibXML2Project(Project):
             self.logger.error(f"Test output:\n{stdout}\n{stderr}")
         return errorcode == 0, {"stdout": stdout, "stderr": stderr, "errorcode": errorcode}
     
-    def _build(self, n_proc=-1, coverage=False):
+    def _build(self, n_proc=-1, coverage=False) -> bool:
         if (self.input_dir / "CMakeLists.txt").exists():
             return self._build_cmake(n_proc)
         else:
-            return super()._build(n_proc=n_proc, coverage=coverage)
+            if not super()._build(n_proc=n_proc, coverage=coverage):
+                return False
+            self.logger.debug("Building tests for libxml2.")
+            cmd = ["make", "check"]
+            _, errorcode, _ = sh(cmd=cmd, cwd=self.input_dir)
+            return errorcode == 0
+
         
 
     def _configure(self, cwd: Path, coverage=False) -> bool | None:
@@ -395,12 +406,17 @@ class LibXML2Project(Project):
             if not (cwd / "configure").exists():
                 _, rc, _ = sh(["./autogen.sh"], cwd=cwd)
                 if rc != 0:
-                    self.logger.error("Autotools autogen.sh failed.")
-                    return False
+                    # autogen.sh may fail on newer autotools due to obsolete macros,
+                    # but configure might already exist from a prior successful run
+                    self.logger.warning("Autotools autogen.sh failed, checking if configure exists.")
+                    if not (cwd / "configure").exists():
+                        self.logger.error("Autotools autogen.sh failed and configure script not found.")
+                        return False
+                    self.logger.info("Using existing configure script despite autogen.sh failure.")
             cmd=['./configure']
             if coverage:
-                cmd.insert(0, 'CFLAGS="--coverage"')
-                cmd.insert(1, 'LDFLAGS="--coverage"')
+                cmd.insert(0, 'CFLAGS=--coverage')
+                cmd.insert(1, 'LDFLAGS=--coverage')
 
         _, errorcode, _ = sh(cmd, cwd=cwd)
         return errorcode == 0
@@ -505,6 +521,10 @@ class CurlProject(Project):
             tests = [t.name for t in tests]
         
         return tests
+    
+    def _get_test_dir_for_energy(self) -> Path:
+        """Override to customize test directory for energy measurement."""
+        return self.input_dir / "tests" if not self._has_cmake_build() else self.input_dir / CMAKE_BUILD_DIR
 
         
 class LibarchiveProject(Project):

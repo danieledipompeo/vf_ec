@@ -170,15 +170,17 @@ def generate_lcov_info(repo_dir: Path, output_file: Path) -> Path:
 
 def generate_gcovr_json(repo_dir: Path, output_file: Path, gcda_folders: list[str] | None = None) -> Path | None:
     """Generate gcovr JSON report from gcda data in repo directory."""
-    gcda_folders = gcda_folders or []
+    gcda_folders = [folder for folder in (gcda_folders or []) if folder.strip() != "."]
+    output_path = str(output_file).strip()
     base_cmd = [
         "gcovr",
         "-r",
         ".",
         *gcda_folders,
+        "--gcov-ignore-parse-errors",
         "--json",
         "--output",
-        str(output_file),
+        output_path,
     ]
     stdout, errorcode, stderr = sh(base_cmd, repo_dir)
     if errorcode != 0:

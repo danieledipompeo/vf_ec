@@ -12,6 +12,13 @@ dataset:
 
 project:
 
+  - libxml2:
+      name: "libxml2"
+      repository: "https://gitlab.gnome.org/GNOME/libxml2.git"
+      build:
+        commands: {}
+        flags: {}
+        compiler: ""
 
   - curl:
       name: "curl"
@@ -32,14 +39,6 @@ project:
   - openssl:
       name: "openssl"
       repository: "https://github.com/openssl/openssl"
-      build:
-        commands: {}
-        flags: {}
-        compiler: ""
-  
-  - curl:
-      name: "curl"
-      repository: "https://github.com/curl/curl"
       build:
         commands: {}
         flags: {}
@@ -69,13 +68,6 @@ project:
   #      flags: {}
   #      compiler: ""
 
-  #- libxml2:
-  #    name: "libxml2"
-  #    repository: "https://gitlab.gnome.org/GNOME/libxml2.git"
-  #    build:
-  #      commands: {}
-  #      flags: {}
-  #      compiler: ""
 
   ## NO COVERAGE DATA START
 

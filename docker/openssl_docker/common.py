@@ -163,6 +163,8 @@ class GitHandler:
             cmd,
             cwd=repo_dir,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             capture_output=True,
             check=True,
         )
@@ -291,7 +293,8 @@ class EnergyHandler:
 
         timeout_ms = EnergyHandler.ITERATION_TIMEOUT_MS  # e.g. 5s default, tune per test
         logger.info(f"Measuring energy for test '{test}': "
-              f"{EnergyHandler.ITERATIONS} iterations × {timeout_ms}ms timeout each")
+              f"{EnergyHandler.ITERATIONS} iterations × {timeout_ms}ms timeout each "
+              f"cooling down between iterations for {EnergyHandler.COOL_DOWN_SEC}s, monitoring events: {perf_events}")
 
         for iteration in range(EnergyHandler.ITERATIONS):
             # pb.set(iteration)
@@ -329,7 +332,6 @@ class EnergyHandler:
                     logger.warning(f"Removing perf output file due to error: {energy_file}")
                     os.remove(energy_file)
                     
-            logger.info(f"[COOL DOWN] {EnergyHandler.COOL_DOWN_SEC} seconds...")
             time.sleep(EnergyHandler.COOL_DOWN_SEC)
 
     @staticmethod
