@@ -569,6 +569,9 @@ class LibarchiveProject(Project):
             return self._build_cmake(n_proc)
         return super()._build(n_proc=n_proc, coverage=coverage)
 
+    def coverage_file(self, test_name: str) -> dict[str, set[int]]:
+        return self._process_coverage_files(self.input_dir, test_name)
+
 class JasperProject(Project):
     """Jasper project using CMake with CTest-based test discovery.
 

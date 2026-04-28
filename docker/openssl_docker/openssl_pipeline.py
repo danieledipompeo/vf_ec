@@ -7,6 +7,7 @@ import time
 import yaml
 
 from common import EnergyHandler, GitHandler, ProgressBar, sh
+import argparse
 from project import Project, ProjectFactory
 from logger import get_logger
 import project
@@ -238,7 +239,7 @@ def compute_energy(commit: str, tests: list[dict], project: Project, build: bool
     
     return True
 
-def main():
+def main(args):
     configuration = load_config(os.path.join(os.path.dirname(__file__), "config.yaml"))
 
     cwe_csv = parse_csv(configuration)
@@ -274,8 +275,11 @@ def main():
                 / f"{project.name}_{fix[:8]}_kept_tests.json"
             )
             
-            if os.path.exists(kept_tests_path.parent):
-                # Folder exists: this project was already processed — never re-run coverage tests.
+            if os.path.exists(kept_tests_path.parent) and not args.force_recompute:
+                existing_files = list(kept_tests_path.parent.glob(f"{project.name}_*_kept_tests.json"))
+                logger.info(f"Found {len(existing_files)} existing kept tests files for project {project.name}.") 
+                logger.info(f"No need to recompute coverage for the project {project.name}.")                
+
                 if not os.path.exists(kept_tests_path):
                     logger.warning(f"No kept tests file found for {fix[:8]}. Skipping pair.")
                     continue
@@ -283,6 +287,7 @@ def main():
                     kept_tests = json.load(f)
                 coverage_dict['tests'] = kept_tests
             else:
+                kept_tests_path.parent.mkdir(parents=True, exist_ok=True)
                 coverage_dict = compute_coverage(project, fix)
                 if coverage_dict is None :
                     logger.error(f"Skipping pair due to no coverage data for FIX commit: {fix[:8]}")
@@ -297,12 +302,14 @@ def main():
                 with open(kept_tests_path, "w") as f:
                     json.dump(kept_tests, f, indent=2, default=list)
 
-            compute_energy(project = project, tests = kept_tests, commit = fix)
-            vuln_build_failure = compute_energy(project = project, tests = kept_tests, commit = vuln)
+            # If args energy is set, compute energy for the kept tests on both vuln and fix commits
+            if args.energy:
+                compute_energy(project = project, tests = kept_tests, commit = fix)
+                vuln_build_failure = compute_energy(project = project, tests = kept_tests, commit = vuln)
             
-            if not vuln_build_failure:
-                logger.error(f"Energy measurement failed for commit {vuln[:8]}. Skipping pair.")
-                continue
+                if not vuln_build_failure:
+                    logger.error(f"Energy measurement failed for commit {vuln[:8]}. Skipping pair.")
+                    continue
 
             coverage_path = os.path.join(project.output_dir, f"{project.name}_{vuln[:8]}_{fix[:8]}_coverage.json")
             coverage_dict['execution_time'] = time.time() - start_time
@@ -311,4 +318,10 @@ def main():
             logger.info(f"Saved coverage results to {coverage_path}")
             
 if __name__ == "__main__":
-    main()
+    # use args for energy computation
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--energy", action="store_true", help="Whether to compute energy for the kept tests.")
+    parser.add_argument("--force-recompute", action="store_true", help="Whether to force re-computation of coverage data.")
+    args = parser.parse_args()
+
+    main(args)

@@ -12,13 +12,21 @@ dataset:
 
 project:
 
-  - curl:
-      name: "curl"
-      repository: "https://github.com/curl/curl"
+  - libarchive:
+      name: "libarchive"
+      repository: "https://github.com/libarchive/libarchive"
       build:
         commands: {}
         flags: {}
         compiler: ""
+
+  #- curl:
+  #    name: "curl"
+  #    repository: "https://github.com/curl/curl"
+  #    build:
+  #      commands: {}
+  #      flags: {}
+  #      compiler: ""
 
   #- libxml2:
   #    name: "libxml2"
@@ -28,13 +36,6 @@ project:
   #      flags: {}
   #      compiler: ""
 
-  #- libarchive:
-  #    name: "libarchive"
-  #    repository: "https://github.com/libarchive/libarchive"
-  #    build:
-  #      commands: {}
-  #      flags: {}
-  #      compiler: ""
 
   #- openssl:
   #    name: "openssl"
