@@ -814,25 +814,6 @@ class VimProject(Project):
     def _get_test_dir_for_energy(self) -> Path:
         return self.test_dir
     
-    def coverage_file(self, test_name: str) -> list[str]:
-        building_dir = self.build_dir
-        gco_files = building_dir.rglob("*.gcda")
-        covered = []
-        for file in gco_files:
-            obj_dir = file.parent
-            stdout, code, stderr = sh(["gcov", "-n", "-o", str(obj_dir), str(file)], cwd=building_dir)
-            if code != 0:
-                self.logger.error(f"gcov failed for {file} with error: {stderr}")
-                continue
-            
-            covered_files = self._extract_covered_file(stdout, obj_dir)
-            if covered_files:
-                for covered_file in covered_files:
-                    covered_file = str(Path(VimProject.SOURCE_DIR) / Path(covered_file).relative_to(obj_dir))
-                    covered.append(covered_file)
-                
-        return covered
-
     def get_test_cmd(self, test_name: str, coverage=True) -> list[str]:
         cmd = ["make", test_name, "HARNESS_JOBS=1", "LINES=24", "COLUMNS=80"]
         cmd_str = "stty rows 24 cols 80;" + " ".join(cmd)
@@ -904,7 +885,9 @@ class VimProject(Project):
         _, errorcode, _ = sh(cmd=cmd, cwd=self.source_dir)
         return errorcode == 0
 
-
+    def coverage_file(self, test_name: str) -> dict[str, set[int]]:
+        return self._process_coverage_files(self.input_dir, test_name)
+    
 class TcpDumpProject(Project):
     """TcpDump project using Autotools build system.
 
@@ -979,6 +962,7 @@ class TcpDumpProject(Project):
             env["LDFLAGS"] = "-fprofile-arcs -ftest-coverage"
         _, errorcode, _ = sh(cmd, cwd=cwd, env=env)
         return errorcode == 0
+
 
 # TODO: check why it doesn't create energy data
 class QEMUProject(Project):

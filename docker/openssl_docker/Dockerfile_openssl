@@ -15,7 +15,6 @@ RUN set -eux; \
         cmake \
         curl \
         flex \
-        gcovr \
         git \
         lcov \
         libaio-dev \
@@ -62,6 +61,7 @@ RUN set -eux; \
         python3-setuptools \
         python3-tomli \
         python3-wheel \
+        pipx \
         rsync \
         valgrind \
         wget \
@@ -90,6 +90,7 @@ RUN wget https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tgz && \
 
 COPY requirements.txt /app/
 RUN pip3 install --no-cache-dir --break-system-packages -r /app/requirements.txt
+RUN pipx install gcovr && pipx ensurepath
 
 # 2. Setup paths
 WORKDIR /app

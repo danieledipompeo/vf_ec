@@ -240,7 +240,7 @@ def compute_energy(commit: str, tests: list[dict], project: Project, build: bool
     return True
 
 def main(args):
-    configuration = load_config(os.path.join(os.path.dirname(__file__), "config.yaml"))
+    configuration = load_config(os.path.join(os.path.dirname(__file__), args.config))
 
     cwe_csv = parse_csv(configuration)
     
@@ -322,6 +322,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--energy", action="store_true", help="Whether to compute energy for the kept tests.")
     parser.add_argument("--force-recompute", action="store_true", help="Whether to force re-computation of coverage data.")
+    parser.add_argument("--config", type=str, default="config.yaml", help="Path to the configuration YAML file.")
     args = parser.parse_args()
 
     main(args)

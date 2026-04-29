@@ -12,13 +12,13 @@ dataset:
 
 project:
 
-  - libarchive:
-      name: "libarchive"
-      repository: "https://github.com/libarchive/libarchive"
-      build:
-        commands: {}
-        flags: {}
-        compiler: ""
+  #- libarchive:
+  #    name: "libarchive"
+  #    repository: "https://github.com/libarchive/libarchive"
+  #    build:
+  #      commands: {}
+  #      flags: {}
+  #      compiler: ""
 
   #- curl:
   #    name: "curl"
@@ -53,13 +53,13 @@ project:
   #      flags: {}
   #      compiler: ""
 
-  #- tcpdump:
-  #    name: "tcpdump"
-  #    repository: "https://github.com/the-tcpdump-group/tcpdump.git"
-  #    build:
-  #      commands: {}
-  #      flags: {}
-  #      compiler: ""
+  - tcpdump:
+      name: "tcpdump"
+      repository: "https://github.com/the-tcpdump-group/tcpdump.git"
+      build:
+        commands: {}
+        flags: {}
+        compiler: ""
 
   #- ffmpeg:
   #    name: "FFmpeg"
