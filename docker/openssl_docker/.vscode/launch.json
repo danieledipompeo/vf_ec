@@ -17,7 +17,7 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
-            "args": ["--force-recompute"],
+            "args": ["--force-recompute", "--project", "openssl"],
             "console": "integratedTerminal"
         },
         {

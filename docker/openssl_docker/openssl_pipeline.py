@@ -1,16 +1,14 @@
 import os
 import csv
-import logging
 import json
 from pathlib import Path
 import time
 import yaml
 
-from common import EnergyHandler, GitHandler, ProgressBar, sh
+from common import GitHandler, sh
 import argparse
 from project import Project, ProjectFactory
 from logger import get_logger
-import project
 
 logger = get_logger(__name__)
 
@@ -244,7 +242,15 @@ def main(args):
 
     cwe_csv = parse_csv(configuration)
     
-    for prj in configuration.get("project", []):
+
+    projects = configuration.get("project", [])
+    if "all" not in args.project:
+        projects = [
+            p for p in projects
+            if any(name in p for name in args.project)
+        ]
+    
+    for prj in projects:
         # Extract project name and config from dict structure
         project_config = prj[list(prj.keys())[0]]
         
@@ -290,12 +296,12 @@ def main(args):
                 kept_tests_path.parent.mkdir(parents=True, exist_ok=True)
                 coverage_dict = compute_coverage(project, fix)
                 if coverage_dict is None :
-                    logger.error(f"Skipping pair due to no coverage data for FIX commit: {fix[:8]}")
+                    logger.warning(f"Skipping pair due to no coverage data for FIX commit: {fix[:8]}")
                     continue
 
                 kept_tests = [t for t in coverage_dict.get('tests', []) if t.get('keep', True)]
                 if not kept_tests:
-                    logger.error(f"No tests to measure energy for in FIX commit: {fix[:8]}. Skipping pair.")
+                    logger.warning(f"No tests to measure energy for in FIX commit: {fix[:8]}. Skipping pair.")
                     continue
 
                 # dump kept_tests to json for later reference
@@ -308,7 +314,7 @@ def main(args):
                 vuln_build_failure = compute_energy(project = project, tests = kept_tests, commit = vuln)
             
                 if not vuln_build_failure:
-                    logger.error(f"Energy measurement failed for commit {vuln[:8]}. Skipping pair.")
+                    logger.warning(f"Energy measurement failed for commit {vuln[:8]}. Skipping pair.")
                     continue
 
             coverage_path = os.path.join(project.output_dir, f"{project.name}_{vuln[:8]}_{fix[:8]}_coverage.json")
@@ -323,6 +329,12 @@ if __name__ == "__main__":
     parser.add_argument("--energy", action="store_true", help="Whether to compute energy for the kept tests.")
     parser.add_argument("--force-recompute", action="store_true", help="Whether to force re-computation of coverage data.")
     parser.add_argument("--config", type=str, default="config.yaml", help="Path to the configuration YAML file.")
+    parser.add_argument(
+        "--project",
+        nargs="+",              # one or more values
+        default=["all"],
+        help="Supported projects: libarchive curl libxml2 openssl vim tcpdump FFmpeg, all"
+    )
     args = parser.parse_args()
 
     main(args)

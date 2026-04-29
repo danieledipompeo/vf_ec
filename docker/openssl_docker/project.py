@@ -116,6 +116,7 @@ class Project(ABC):
             cmd.append(f"-j{n_proc}")
         
         _, errorcode, _ = sh(cmd=cmd, cwd=self.input_dir)
+        self.logger.info(f"Build {'succeeded' if errorcode == 0 else 'failed'} for {self.name}.")
         return errorcode == 0
 
     def _resolve_source_path(self, reported_file: str, objdir: Path) -> Path:
@@ -156,32 +157,6 @@ class Project(ABC):
     def coverage_file(self, test_name: str) -> dict[str, set[int]]:
         return self._process_coverage_files(self.build_dir, test_name) 
     
-    #def _process_coverage_files(self, building_dir: Path) -> list[str]:
-    #    """Process .gcda files and return list of covered files."""
-    #    gco_files = list(building_dir.rglob("*.gcda"))
-    #    self.logger.debug(f"Found {len(gco_files)} .gcda files in {building_dir}")
-    #    covered = []
-    #    for file in gco_files:
-    #        obj_dir = file.parent
-    #        stdout, code, stderr = sh(["gcov", "-n", "-o", str(obj_dir), str(file)], cwd=building_dir)
-    #        if code != 0:
-    #            self.logger.error(f"gcov failed for {file} with error: {stderr}")
-    #            continue
-    #        
-    #        covered_files = self._extract_covered_file(stdout, obj_dir)
-    #        if covered_files:
-    #            for covered_file in covered_files:
-    #                covered_path = Path(covered_file)
-    #                try:
-    #                    covered.append(str(covered_path.relative_to(self.input_dir)))
-    #                except ValueError:
-    #                    self.logger.debug(
-    #                        "Skipping generated coverage file outside source tree: %s",
-    #                        covered_path,
-    #                    )
-    #            
-    #    return covered
-    
     def _process_coverage_files(self, building_dir: Path, test_name: str) -> dict[str, set[int]]:
         """
         Process .gcda files using gcovr JSON output to get covered lines per file.
@@ -196,7 +171,7 @@ class Project(ABC):
         )
         gcda_folders = sorted({line.strip() for line in gcda_dirs_out.splitlines() if line.strip()})
         try:
-            generate_gcovr_json(building_dir, gcovr_json_path, gcda_folders)
+            gcovr_json_path = generate_gcovr_json(building_dir, gcovr_json_path, gcda_folders)
         except RuntimeError as err:
             print("Warning: gcovr generation failed, continuing with lcov only.")
             print(err)
@@ -209,7 +184,11 @@ class Project(ABC):
             ).items()
             if str(file_name).strip() and covered_lines
         }
-        
+
+        # delete file pointed to by gcovr_json_path
+        if gcovr_json_path and gcovr_json_path.exists():
+            gcovr_json_path.unlink()
+
         return covered
          
 
@@ -225,6 +204,7 @@ class Project(ABC):
         if not self._configure(cwd=self.input_dir, coverage=coverage):
             self.logger.error("Configuration failed, cannot build.")
             return False
+        self.logger.info(f"Configuration succeeded for {self.name}, starting build.")
         return self._build(n_proc=n_proc, coverage=coverage)
 
     @abstractmethod
@@ -302,17 +282,6 @@ class ImageMagickProject(Project):
         _, errorcode, _ = sh(cmd, cwd=cwd)
         return errorcode == 0
         
-    def _build(self, n_proc=-1, coverage=False):
-        cmd = ["make"]
-        if n_proc == -1:
-            nproc = os.cpu_count() or 1
-            cmd.append(f"-j{nproc}")
-        else:
-            cmd.append(f"-j{n_proc}")
-        
-        _, errorcode, _ = sh(cmd=cmd, cwd=self.input_dir)
-        return errorcode == 0
-
     def _run(self, cmd: list[str]) -> tuple[bool, dict]:
         stdout, errorcode, stderr = sh(cmd, cwd=self.input_dir)
         if errorcode != 0:
@@ -387,8 +356,6 @@ class LibXML2Project(Project):
             cmd = ["make", "check"]
             _, errorcode, _ = sh(cmd=cmd, cwd=self.input_dir)
             return errorcode == 0
-
-        
 
     def _configure(self, cwd: Path, coverage=False) -> bool | None:
         if (cwd / "CMakeLists.txt").exists():
@@ -633,53 +600,6 @@ class JasperProject(Project):
 
         return tests
 
-    def _process_coverage_files(self, building_dir: Path) -> list[str]:
-        """Collect coverage files for Jasper from its out-of-source build dir.
-
-        Jasper often leaves stale .gcda files when binaries are rebuilt. We
-        skip those artifacts instead of failing the whole coverage pass.
-        """
-        gco_files = list(building_dir.rglob("*.gcda"))
-        self.logger.debug(f"Found {len(gco_files)} .gcda files in {building_dir}")
-        covered: list[str] = []
-
-        for gcda in gco_files:
-            obj_dir = gcda.parent
-            gcno = gcda.with_suffix(".gcno")
-            if not gcno.exists():
-                self.logger.warning(f"Skipping {gcda}: missing matching {gcno.name}")
-                continue
-
-            gcov_target = str(gcda.with_suffix(""))
-            stdout, code, stderr = sh(
-                ["gcov", "-n", "-o", str(obj_dir), gcov_target],
-                cwd=obj_dir,
-            )
-
-            if code != 0:
-                stderr_l = stderr.lower()
-                if "stamp mismatch" in stderr_l or "cannot open notes file" in stderr_l:
-                    # Remove stale runtime data so later passes are cleaner.
-                    try:
-                        gcda.unlink(missing_ok=True)
-                    except OSError:
-                        pass
-                    self.logger.warning(f"Skipping stale coverage artifact {gcda}: {stderr.strip()}")
-                else:
-                    self.logger.error(f"gcov failed for {gcda} with error: {stderr}")
-                continue
-
-            covered_files = self._extract_covered_file(stdout, obj_dir)
-            if covered_files:
-                for covered_file in covered_files:
-                    try:
-                        covered.append(str(Path(covered_file).relative_to(self.input_dir)))
-                    except ValueError:
-                        covered.append(str(Path(covered_file)))
-
-        # Keep deterministic output and avoid duplicates.
-        return sorted(set(covered))
-
     def _configure(self, cwd: Path, coverage=False) -> bool:
         cmd = [
             "cmake", "-S", str(self.input_dir), "-B", str(self.build_dir),
@@ -748,16 +668,6 @@ class OpenSSLProject(Project):
             tests = [os.path.splitext(os.path.basename(t))[0] for t in tests] 
         
         return tests 
-    
-    def _build(self, n_proc=1, coverage=False):
-        cmd = ["make"]
-        
-        if n_proc == -1:
-            cmd.append(f"-j")
-        else:
-            cmd.append(f"-j{n_proc}")
-        _, errorcode, _ = sh(cmd=cmd, cwd=self.input_dir)
-        return errorcode == 0
     
     def _configure(self, cwd: Path, coverage=False) -> bool:
         config_args = ["./Configure"]
